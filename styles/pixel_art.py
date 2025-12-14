@@ -7,7 +7,7 @@ STYLE_NAME = "Pixel Art"
 STYLE_DESCRIPTION = "Retro pixel art with half-block characters"
 
 
-def render_waveform(i, amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with retro pixel art effect.
 

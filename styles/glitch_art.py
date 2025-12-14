@@ -7,7 +7,7 @@ STYLE_NAME = "Glitch Art"
 STYLE_DESCRIPTION = "Corrupted, glitchy characters with visual artifacts"
 
 
-def render_waveform(age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with glitch art effect.
 

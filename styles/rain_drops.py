@@ -7,7 +7,7 @@ STYLE_NAME = "Rain Drops"
 STYLE_DESCRIPTION = "Gentle falling water droplets and splashes"
 
 
-def render_waveform(amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with rain drops effect.
 

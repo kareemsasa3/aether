@@ -6,7 +6,7 @@ STYLE_NAME = "Minimalist"
 STYLE_DESCRIPTION = "Clean, elegant dots and dashes only"
 
 
-def render_waveform(amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with minimalist effect.
 

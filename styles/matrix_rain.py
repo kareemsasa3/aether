@@ -7,7 +7,7 @@ STYLE_NAME = "Matrix Rain"
 STYLE_DESCRIPTION = "Binary cascading 0s and 1s with digital rain effect"
 
 
-def render_waveform(age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with Matrix-style binary rain effect.
 

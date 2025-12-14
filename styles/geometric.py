@@ -7,7 +7,7 @@ STYLE_NAME = "Geometric"
 STYLE_DESCRIPTION = "Triangles and geometric shapes in patterns"
 
 
-def render_waveform(i, amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with geometric shapes.
 

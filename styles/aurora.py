@@ -8,7 +8,7 @@ STYLE_NAME = "Aurora"
 STYLE_DESCRIPTION = "Northern lights with flowing color curtains"
 
 
-def render_waveform(i, amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with aurora borealis effect.
 

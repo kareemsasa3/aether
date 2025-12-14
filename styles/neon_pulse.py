@@ -6,7 +6,7 @@ STYLE_NAME = "Neon Pulse"
 STYLE_DESCRIPTION = "Electric pulsating blocks with intense glow"
 
 
-def render_waveform(amp, age, colors):
+def render_waveform(i, amp, age, max_width, colors):
     """
     Render waveform with neon glow effect.
 
