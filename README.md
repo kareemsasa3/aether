@@ -31,7 +31,7 @@ sudo apt install python3 pipewire openrgb
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/aether.git
+git clone https://github.com/kareemsasa3/aether.git
 cd aether
 python -m venv venv
 source venv/bin/activate  # or `venv/bin/activate` on Windows
