@@ -4,7 +4,7 @@
 
 A terminal-based audio visualizer with real-time frequency analysis and RGB LED synchronization. Watch your music ripple across your screen and illuminate your hardware.
 
-![Aether Demo](demo.gif)
+![Aether Demo](assets/demo.gif)
 
 ## ✨ Features
 
