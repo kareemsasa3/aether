@@ -1,4 +1,4 @@
-#!/home/kareem/code/aether/venv/bin/python3
+#!/usr/bin/env python3
 """
 Shared Memory IPC for Aether
 

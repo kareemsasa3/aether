@@ -1,4 +1,4 @@
-#!/home/kareem/code/aether/venv/bin/python3
+#!/usr/bin/env python3
 # aether_daemon.py - Direct PipeWire pipeline
 import subprocess
 import numpy as np
@@ -96,7 +96,7 @@ class AetherDaemon:
         signal.signal(signal.SIGTERM, self.signal_handler)
 
         print("[Audio Daemon V3] Using PipeWire direct pipeline")
-        print("[Audio Daemon V3] Target: Razer Seiren X")
+        print("[Audio Daemon V3] Using system default microphone")
         print(f"[Audio Daemon V3] Sample rate: {self.SAMPLE_RATE} Hz")
         print("[Audio Daemon V3] Press Ctrl+C to stop\n")
 
@@ -199,10 +199,9 @@ class AetherDaemon:
     def run(self):
         """Main loop - read from pw-record pipe"""
         # Start pw-record as subprocess, pipe stdout to us
+        # No --target flag = uses system default microphone
         cmd = [
             "pw-record",
-            "--target",
-            "alsa_input.usb-Razer_Inc_Razer_Seiren_X_UC2029L01304483-00.analog-stereo",
             "--format",
             "s16",  # 16-bit signed PCM
             "--channels",
@@ -220,7 +219,7 @@ class AetherDaemon:
                 bufsize=self.CHUNK_SIZE * 2,  # 2 bytes per sample
             )
 
-            print("🎤 Listening to Razer Seiren X!")
+            print("🎤 Listening to default microphone!")
             print("Play music, talk, whistle, sing!")
             print("-" * 70)
 

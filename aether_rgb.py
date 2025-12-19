@@ -1,4 +1,4 @@
-#!/home/kareem/code/aether/venv/bin/python3
+#!/usr/bin/env python3
 # aether_rgb.py - Traveling wave RGB effect with multi-band audio analysis
 import time
 import sys
