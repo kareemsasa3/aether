@@ -7,7 +7,7 @@ STYLE_NAME = "Pixel Art"
 STYLE_DESCRIPTION = "Retro pixel art with half-block characters"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with retro pixel art effect.
 
@@ -17,6 +17,9 @@ def render_waveform(i, amp, age, max_width, colors):
     if age >= 100:
         return None
 
+    # Use seeded random for stability
+    rng = random.Random(sample_id)
+
     # Half-block characters for that pixel art look
     if amp > 0.3:
         chars = ["▀", "▘", "▝", "▖", "▗"]
@@ -25,11 +28,11 @@ def render_waveform(i, amp, age, max_width, colors):
     else:
         chars = ["▌", "▐", "▕", "▏"]
 
-    # Add some variation based on position
+    # Add some variation based on position (now stable per sample)
     if i % 2 == 0:
-        char = random.choice(chars[:3])
+        char = rng.choice(chars[:3])
     else:
-        char = random.choice(chars)
+        char = rng.choice(chars)
 
     # Retro color transition: bright to dim
     if age < 4:

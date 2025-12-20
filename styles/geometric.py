@@ -7,7 +7,7 @@ STYLE_NAME = "Geometric"
 STYLE_DESCRIPTION = "Triangles and geometric shapes in patterns"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with geometric shapes.
 
@@ -16,6 +16,9 @@ def render_waveform(i, amp, age, max_width, colors):
     """
     if age >= 100:
         return None
+
+    # Use seeded random for stability
+    rng = random.Random(sample_id)
 
     # Shape selection based on amplitude direction and position
     if amp > 0.2:
@@ -37,7 +40,7 @@ def render_waveform(i, amp, age, max_width, colors):
     elif pattern_pos == 2:
         char = shapes[4 if age < 8 else 5]
     else:
-        char = random.choice(shapes[1:3])
+        char = rng.choice(shapes[1:3])
 
     # Age-based color with geometric precision
     if age < 3:

@@ -7,7 +7,7 @@ STYLE_NAME = "Matrix Rain"
 STYLE_DESCRIPTION = "Binary cascading 0s and 1s with digital rain effect"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with Matrix-style binary rain effect.
 
@@ -15,19 +15,22 @@ def render_waveform(i, amp, age, max_width, colors):
     fading from bright green to dim as they age.
     """
     # Skip very old samples
-    if age >= 60:  # Extended from 20 for longer persistence
+    if age >= 60:
         return None
 
-    # Character selection: mix of blocks and binary for that Matrix feel
-    # Newer samples have more blocks, older ones transition to binary
-    if age < 9:
-        char = random.choices(["█", "▓", "0", "1"], weights=[50, 20, 15, 15], k=1)[0]
-    elif age < 24:
-        char = random.choices(["▓", "▒", "0", "1"], weights=[30, 20, 25, 25], k=1)[0]
-    else:
-        char = random.choices(["0", "1", "░", " "], weights=[35, 35, 20, 10], k=1)[0]
+    # Use a seeded random for stable character selection (prevents flicker)
+    # The sample_id is constant for a specific audio sample as it radiates.
+    rng = random.Random(sample_id)
 
-    # Age-based intensity for that phosphor decay look (extended age ranges)
+    # Character selection: mix of blocks and binary for that Matrix feel
+    if age < 9:
+        char = rng.choices(["█", "▓", "0", "1"], weights=[50, 20, 15, 15], k=1)[0]
+    elif age < 24:
+        char = rng.choices(["▓", "▒", "0", "1"], weights=[30, 20, 25, 25], k=1)[0]
+    else:
+        char = rng.choices(["0", "1", "░", " "], weights=[35, 35, 20, 10], k=1)[0]
+
+    # Age-based intensity for that phosphor decay look
     if age < 9:
         attr = colors[1] | curses.A_BOLD
     elif age < 21:

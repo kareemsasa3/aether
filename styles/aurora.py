@@ -8,15 +8,18 @@ STYLE_NAME = "Aurora"
 STYLE_DESCRIPTION = "Northern lights with flowing color curtains"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with aurora borealis effect.
 
     Creates flowing, curtain-like patterns with color
     shifts reminiscent of the northern lights.
     """
-    if age >= 80:  # Extended from 30 for much longer persistence
+    if age >= 80:
         return None
+
+    # Use seeded random for stability
+    rng = random.Random(sample_id)
 
     # Aurora characters - flowing, wave-like
     curtains = ["░", "▒", "▓", "█", "│", "║"]
@@ -25,18 +28,18 @@ def render_waveform(i, amp, age, max_width, colors):
 
     intensity = abs(amp)
 
-    # Layer selection based on intensity and age (extended age ranges)
+    # Layer selection based on intensity and age
     if age < 9:
         if intensity > 0.5:
-            char = random.choice(curtains[3:5])
+            char = rng.choice(curtains[3:5])
         else:
-            char = random.choice(curtains[1:4])
+            char = rng.choice(curtains[1:4])
     elif age < 30:
-        char = random.choice(curtains[:3] + wisps[:2])
+        char = rng.choice(curtains[:3] + wisps[:2])
     elif age < 50:
-        char = random.choice(wisps + particles[:3])
+        char = rng.choice(wisps + particles[:3])
     else:
-        char = random.choice(particles)
+        char = rng.choice(particles)
 
     # Aurora color dancing - cycle through colors based on position
     wave = math.sin(i * 0.15 + age * 0.1)
@@ -66,9 +69,9 @@ def render_waveform(i, amp, age, max_width, colors):
     else:
         attr = colors[2] | curses.A_DIM
 
-    # Occasional bright sparkle
-    if random.random() < 0.02:
+    # Occasional bright sparkle - now stable per sample
+    if rng.random() < 0.02:
         char = "✧"
-        attr = colors[random.choice([1, 3, 4])] | curses.A_BOLD
+        attr = colors[rng.choice([1, 3, 4])] | curses.A_BOLD
 
     return (char, attr)

@@ -7,15 +7,18 @@ STYLE_NAME = "Starfield"
 STYLE_DESCRIPTION = "Twinkling stars and cosmic sparkles"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with starfield effect.
 
     Uses star characters of varying brightness to create
     a twinkling, cosmic aesthetic.
     """
-    if age >= 80:  # Extended from 28 for longer persistence
+    if age >= 80:
         return None
+
+    # Use seeded random for stability
+    rng = random.Random(sample_id)
 
     intensity = abs(amp)
 
@@ -24,16 +27,16 @@ def render_waveform(i, amp, age, max_width, colors):
     medium_stars = ["✧", "⋆", "*", "·", "∙"]
     dim_stars = ["·", "∙", "⋅", ".", "˙"]
 
-    # Select stars based on intensity and age (extended age ranges)
+    # Select stars based on intensity and age
     if intensity > 0.5 and age < 15:
-        char = random.choice(bright_stars)
+        char = rng.choice(bright_stars)
     elif intensity > 0.3 or age < 30:
-        char = random.choice(medium_stars)
+        char = rng.choice(medium_stars)
     else:
-        char = random.choice(dim_stars)
+        char = rng.choice(dim_stars)
 
-    # Twinkling effect - random brightness variations
-    twinkle = random.random()
+    # Twinkling effect - random brightness variations (now stable per sample)
+    twinkle = rng.random()
 
     if age < 9 and twinkle > 0.7:
         # Bright twinkle

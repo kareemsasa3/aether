@@ -7,7 +7,7 @@ STYLE_NAME = "Neon Wave"
 STYLE_DESCRIPTION = "Vibrant neon glow with smooth color transitions"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with neon glow effect.
     

@@ -16,18 +16,25 @@ class UltimateOscilloscope:
     DEBUG_MODE = False
     BURST_WIDTH_RATIO = 0.6
     SPECTRUM_DECAY_LEGACY = 0.8
-    
+
     # Configurable settings with their ranges: (default, min, max, step, name, description)
     CONFIG_SCHEMA = {
         "samples_per_frame": (2, 1, 8, 1, "Scroll Speed", "Animation speed"),
-        "waveform_decay": (0.98, 0.90, 0.999, 0.005, "Trail Length", "Trail persistence"),
+        "waveform_decay": (
+            0.98,
+            0.90,
+            0.999,
+            0.005,
+            "Trail Length",
+            "Trail persistence",
+        ),
         "spectrum_decay": (0.92, 0.70, 0.99, 0.02, "Spectrum Decay", "Bar fade speed"),
         "rgb_decay": (0.85, 0.50, 0.95, 0.05, "RGB Decay", "RGB fade speed"),
         "smooth_factor": (0.3, 0.05, 0.8, 0.05, "Smoothing", "Transition smoothness"),
         "intensity": (1.0, 0.5, 2.0, 0.1, "Intensity", "Amplitude boost"),
         "virtual_sample_rate": (500, 200, 1000, 50, "Wave Detail", "Wave resolution"),
     }
-    
+
     # Presets: name -> {setting: value}
     PRESETS = {
         "phosphor": {
@@ -76,7 +83,7 @@ class UltimateOscilloscope:
 
         # Initialize configurable settings from schema
         self._init_config()
-        
+
         # Config menu state
         self.config_keys = list(self.CONFIG_SCHEMA.keys())
 
@@ -84,16 +91,16 @@ class UltimateOscilloscope:
         # Using 256-color mode if available for richer colors
         if curses.can_change_color() and curses.COLORS >= 256:
             # Custom colors for a more vibrant look
-            curses.init_pair(1, 46, -1)   # Bright green (neon)
-            curses.init_pair(2, 22, -1)   # Dim green (forest)
-            curses.init_pair(3, 51, -1)   # Cyan (electric)
+            curses.init_pair(1, 46, -1)  # Bright green (neon)
+            curses.init_pair(2, 22, -1)  # Dim green (forest)
+            curses.init_pair(3, 51, -1)  # Cyan (electric)
             curses.init_pair(4, 201, -1)  # Magenta (hot pink)
-            curses.init_pair(5, 33, -1)   # Blue (deep)
+            curses.init_pair(5, 33, -1)  # Blue (deep)
             curses.init_pair(6, 226, -1)  # Yellow (gold)
             curses.init_pair(7, 208, -1)  # Orange (amber)
             curses.init_pair(8, 245, -1)  # Gray (subtle)
             curses.init_pair(9, 196, -1)  # Red (hot)
-            curses.init_pair(10, 129, -1) # Purple (violet)
+            curses.init_pair(10, 129, -1)  # Purple (violet)
         else:
             # Fallback to basic 8 colors
             curses.init_pair(1, curses.COLOR_GREEN, -1)
@@ -103,7 +110,7 @@ class UltimateOscilloscope:
             curses.init_pair(5, curses.COLOR_BLUE, -1)
             curses.init_pair(6, curses.COLOR_YELLOW, -1)
             curses.init_pair(7, curses.COLOR_YELLOW, -1)  # Orange fallback
-            curses.init_pair(8, curses.COLOR_WHITE, -1)   # Gray fallback
+            curses.init_pair(8, curses.COLOR_WHITE, -1)  # Gray fallback
             curses.init_pair(9, curses.COLOR_RED, -1)
             curses.init_pair(10, curses.COLOR_MAGENTA, -1)
 
@@ -165,7 +172,14 @@ class UltimateOscilloscope:
 
     def _init_config(self):
         """Initialize configurable settings from schema defaults"""
-        for key, (default, min_val, max_val, step, name, desc) in self.CONFIG_SCHEMA.items():
+        for key, (
+            default,
+            min_val,
+            max_val,
+            step,
+            name,
+            desc,
+        ) in self.CONFIG_SCHEMA.items():
             setattr(self, key, default)
 
     def _get_config_value(self, key):
@@ -178,7 +192,7 @@ class UltimateOscilloscope:
         min_val, max_val = schema[1], schema[2]
         clamped = max(min_val, min(max_val, value))
         setattr(self, key, clamped)
-        
+
         # Update derived values if needed
         if key == "virtual_sample_rate":
             self.RATE = clamped
@@ -321,19 +335,21 @@ class UltimateOscilloscope:
         # Top border with gradient effect
         border_chars = "━" * self.width
         self.safe_addstr(0, 0, border_chars, curses.color_pair(8))
-        
+
         # Title bar - clean modern look
         title = " ◉ AETHER "
         subtitle = "audio visualizer"
-        
+
         # Draw title on left
         self.safe_addstr(1, 2, title, curses.color_pair(3) | curses.A_BOLD)
         self.safe_addstr(1, 2 + len(title), subtitle, curses.color_pair(8))
-        
+
         # Draw mode indicator on right
         mode_str = f"[ {self.design_mode} ]"
-        self.safe_addstr(1, self.width - len(mode_str) - 2, mode_str, curses.color_pair(6))
-        
+        self.safe_addstr(
+            1, self.width - len(mode_str) - 2, mode_str, curses.color_pair(6)
+        )
+
         # Second border
         self.safe_addstr(2, 0, border_chars, curses.color_pair(8))
 
@@ -346,7 +362,7 @@ class UltimateOscilloscope:
                 label,
                 curses.color_pair(1) | curses.A_BOLD,
             )
-            
+
             # Subtle frequency indicator
             if self.current_freq > 0:
                 freq_str = f"{self.current_freq:.0f} Hz"
@@ -381,7 +397,7 @@ class UltimateOscilloscope:
                 "◈ RGB",
                 curses.color_pair(4) | curses.A_BOLD,
             )
-            
+
         elif self.design_mode == "SPECTRUM":
             self.safe_addstr(
                 self.spectrum_start - 1,
@@ -393,35 +409,35 @@ class UltimateOscilloscope:
     def draw_waveform_grid(self):
         """Draw subtle center line with gradient fade at edges"""
         center_y = self.waveform_start + (self.waveform_height // 2)
-        
+
         # Create a subtle center line with fading edges
         line_width = self.graph_width
         fade_width = min(8, line_width // 6)
-        
+
         # Draw main center line (dim)
         self.safe_addstr(
-            center_y, 
-            self.graph_x_start + fade_width, 
-            "─" * (line_width - fade_width * 2), 
-            curses.color_pair(8)
+            center_y,
+            self.graph_x_start + fade_width,
+            "─" * (line_width - fade_width * 2),
+            curses.color_pair(8),
         )
-        
+
         # Fading edges using lighter dash characters
         fade_chars = ["╌", "┄", "┈", "·"]
         for i in range(min(fade_width, len(fade_chars))):
             # Left fade
             self.safe_addstr(
-                center_y, 
-                self.graph_x_start + i, 
-                fade_chars[min(i, len(fade_chars)-1)], 
-                curses.color_pair(8)
+                center_y,
+                self.graph_x_start + i,
+                fade_chars[min(i, len(fade_chars) - 1)],
+                curses.color_pair(8),
             )
-            # Right fade  
+            # Right fade
             self.safe_addstr(
-                center_y, 
-                self.graph_x_end - i - 1, 
-                fade_chars[min(i, len(fade_chars)-1)], 
-                curses.color_pair(8)
+                center_y,
+                self.graph_x_end - i - 1,
+                fade_chars[min(i, len(fade_chars) - 1)],
+                curses.color_pair(8),
             )
 
     def draw_waveform(self):
@@ -457,8 +473,12 @@ class UltimateOscilloscope:
                 if 0 <= idx < len(self.last_ys):
                     self.last_ys[idx] = y
 
+                # Calculate a stable sample_id that stays with the sample as it radiates.
+                # This prevents flickering in styles that use randomness.
+                sample_id = i - int(age * self.samples_per_frame)
+
                 result = self.style.render_waveform(
-                    i, amp, age, self.graph_width // 2, colors
+                    i, amp, age, self.graph_width // 2, colors, sample_id
                 )
                 if result:
                     char, attr = result
@@ -484,8 +504,11 @@ class UltimateOscilloscope:
                 if 0 <= idx < len(self.last_ys):
                     self.last_ys[idx] = y
 
+                # Calculate stable sample_id
+                sample_id = i - int(age * self.samples_per_frame)
+
                 result = self.style.render_waveform(
-                    i, amp, age, self.graph_width // 2, colors
+                    i, amp, age, self.graph_width // 2, colors, sample_id
                 )
                 if result:
                     char, attr = result
@@ -508,13 +531,13 @@ class UltimateOscilloscope:
 
         # Band configuration with colors that create a rainbow gradient
         bands_config = [
-            ("SUB", 10),    # Purple
-            ("BASS", 4),    # Magenta
-            ("LOW", 5),     # Blue
-            ("MID", 3),     # Cyan
-            ("HIGH", 1),    # Green
+            ("SUB", 10),  # Purple
+            ("BASS", 4),  # Magenta
+            ("LOW", 5),  # Blue
+            ("MID", 3),  # Cyan
+            ("HIGH", 1),  # Green
             ("TREBLE", 6),  # Yellow
-            ("AIR", 7),     # Orange
+            ("AIR", 7),  # Orange
         ]
 
         band_values = [
@@ -554,23 +577,28 @@ class UltimateOscilloscope:
             # Draw the bar from bottom up
             for h in range(bar_max_height):
                 y = start_y - h
-                
+
                 if h < full_blocks:
                     # Full block with intensity gradient (brighter at top)
                     intensity_factor = 0.5 + (h / bar_max_height) * 0.5
                     attr = color | curses.A_BOLD if intensity_factor > 0.7 else color
                     self.safe_addstr(y, x_pos, "█" * bar_width, attr)
-                    
+
                 elif h == full_blocks and partial > 0:
                     # Partial block at top for smooth animation
                     partial_idx = int(partial * 8)
                     partial_char = blocks[min(8, partial_idx)]
                     self.safe_addstr(y, x_pos, partial_char * bar_width, color)
-                    
+
                 else:
                     # Empty space - draw very subtle grid
                     if h % 4 == 0:
-                        self.safe_addstr(y, x_pos, "·" * bar_width, curses.color_pair(8) | curses.A_DIM)
+                        self.safe_addstr(
+                            y,
+                            x_pos,
+                            "·" * bar_width,
+                            curses.color_pair(8) | curses.A_DIM,
+                        )
 
     def draw_spectrum(self):
         """Draw compact spectrum analyzer footer with smooth gradient bars"""
@@ -579,13 +607,13 @@ class UltimateOscilloscope:
 
         # Band configuration: name, color pair index
         bands_config = [
-            ("SUB", 10),   # Purple for sub-bass
-            ("BAS", 4),    # Magenta for bass
-            ("LMD", 5),    # Blue for low-mid
-            ("MID", 3),    # Cyan for mid
-            ("HMD", 1),    # Green for high-mid
-            ("TRE", 6),    # Yellow for treble
-            ("AIR", 7),    # Orange for sparkle/air
+            ("SUB", 10),  # Purple for sub-bass
+            ("BAS", 4),  # Magenta for bass
+            ("LMD", 5),  # Blue for low-mid
+            ("MID", 3),  # Cyan for mid
+            ("HMD", 1),  # Green for high-mid
+            ("TRE", 6),  # Yellow for treble
+            ("AIR", 7),  # Orange for sparkle/air
         ]
 
         # Map spectrum_values to 7 bands
@@ -619,22 +647,19 @@ class UltimateOscilloscope:
             if level >= 6:
                 top_char = bar_chars[min(8, level - 4)]
                 mid_char = "█"
-                bot_char = "█"
             elif level >= 3:
                 top_char = " "
                 mid_char = bar_chars[min(8, level)]
-                bot_char = "█"
             else:
                 top_char = " "
                 mid_char = " "
-                bot_char = bar_chars[max(1, level * 2)] if level > 0 else "▁"
 
             # Draw with glow effect on high values
             attr = color | curses.A_BOLD if value > 0.5 else color
 
             self.safe_addstr(self.spectrum_start, x, top_char, attr)
             self.safe_addstr(self.spectrum_start + 1, x, mid_char, attr)
-            
+
             # Label with dimmer color
             self.safe_addstr(self.spectrum_start + 2, x, name, curses.color_pair(8))
 
@@ -645,9 +670,9 @@ class UltimateOscilloscope:
 
         # Channel configuration with smooth gradient characters
         channels = [
-            ("LOW", self.bass_level, 4, 10),    # Magenta/Purple
-            ("MID", self.mid_level, 3, 5),      # Cyan/Blue
-            ("HI ", self.treble_level, 6, 7),   # Yellow/Orange
+            ("LOW", self.bass_level, 4, 10),  # Magenta/Purple
+            ("MID", self.mid_level, 3, 5),  # Cyan/Blue
+            ("HI ", self.treble_level, 6, 7),  # Yellow/Orange
         ]
 
         # Gradient block characters
@@ -661,7 +686,7 @@ class UltimateOscilloscope:
 
             # Calculate bar segments
             bar_length = int(level * max_bar_width)
-            
+
             if bar_length > 0:
                 # Create gradient bar
                 bar_x = x + 4
@@ -669,11 +694,11 @@ class UltimateOscilloscope:
                     # Transition from color1 to color2 across the bar
                     progress = j / max(1, max_bar_width - 1)
                     color = curses.color_pair(color1 if progress < 0.5 else color2)
-                    
+
                     # Use denser characters toward the front
                     char_idx = min(3, int((1 - j / max(1, bar_length)) * 4))
                     char = gradient[3 - char_idx] if j < bar_length else " "
-                    
+
                     attr = color | curses.A_BOLD if level > 0.6 else color
                     self.safe_addstr(y, bar_x + j, char, attr)
 
@@ -718,7 +743,7 @@ class UltimateOscilloscope:
             ("D", "Mode"),
             ("Q", "Quit"),
         ]
-        
+
         x = 1
         for key, label in hints:
             self.safe_addstr(status_y, x, key, curses.color_pair(6) | curses.A_BOLD)
@@ -729,8 +754,12 @@ class UltimateOscilloscope:
         if self.current_freq > 0:
             # Pulsing indicator when audio active
             indicator = "● "
-            self.safe_addstr(status_y, x + 2, indicator, curses.color_pair(1) | curses.A_BOLD)
-            self.safe_addstr(status_y, x + 4, f"{self.current_freq:.0f}Hz", curses.color_pair(8))
+            self.safe_addstr(
+                status_y, x + 2, indicator, curses.color_pair(1) | curses.A_BOLD
+            )
+            self.safe_addstr(
+                status_y, x + 4, f"{self.current_freq:.0f}Hz", curses.color_pair(8)
+            )
         else:
             self.safe_addstr(status_y, x + 2, "○ awaiting signal", curses.color_pair(8))
 
@@ -738,7 +767,9 @@ class UltimateOscilloscope:
         style_name = getattr(self.style, "STYLE_NAME", "Unknown")
         right_text = f"◈ {style_name}"
         right_x = self.width - len(right_text) - 2
-        self.safe_addstr(status_y, right_x, right_text, curses.color_pair(3) | curses.A_BOLD)
+        self.safe_addstr(
+            status_y, right_x, right_text, curses.color_pair(3) | curses.A_BOLD
+        )
 
     def check_for_events(self):
         """Poll for events from Shared Memory or Legacy File"""
@@ -915,17 +946,24 @@ class UltimateOscilloscope:
         """Update RGB preview targets from frequency bands"""
         # Apply intensity multiplier
         intensity = self.intensity
-        
+
         # Bass: sub_bass (Indigo) + bass (Violet) -> Purple/Magenta
-        self.target_bass = min(1.0, (bands.get("sub_bass", 0) + bands.get("bass", 0)) / 2 * intensity)
+        self.target_bass = min(
+            1.0, (bands.get("sub_bass", 0) + bands.get("bass", 0)) / 2 * intensity
+        )
 
         # Mid: low_mid (Blue) + mid (Cyan) + high_mid (Green) -> Cyan avg
-        self.target_mid = min(1.0, (
-            bands.get("low_mid", 0) + bands.get("mid", 0) + bands.get("high_mid", 0)
-        ) / 3 * intensity)
+        self.target_mid = min(
+            1.0,
+            (bands.get("low_mid", 0) + bands.get("mid", 0) + bands.get("high_mid", 0))
+            / 3
+            * intensity,
+        )
 
         # Treble: treble (Yellow) + sparkle (Orange) -> Yellow avg
-        self.target_treble = min(1.0, (bands.get("treble", 0) + bands.get("sparkle", 0)) / 2 * intensity)
+        self.target_treble = min(
+            1.0, (bands.get("treble", 0) + bands.get("sparkle", 0)) / 2 * intensity
+        )
 
     def decay_all(self):
         """Decay waveform and age samples in both halves"""
@@ -1031,7 +1069,9 @@ class UltimateOscilloscope:
         visible_count = min(len(style_info), max_visible_items)
 
         menu_width = min(55, self.width - 4)
-        menu_height = visible_count + 6  # top + subtitle + divider + items + divider + bottom
+        menu_height = (
+            visible_count + 6
+        )  # top + subtitle + divider + items + divider + bottom
         menu_y = max(2, (self.height - menu_height) // 2)
         menu_x = max(2, (self.width - menu_width) // 2)
 
@@ -1055,31 +1095,55 @@ class UltimateOscilloscope:
 
             # Draw box border
             # Top
-            self.safe_addstr(menu_y, menu_x, "┌" + "─" * (menu_width - 2) + "┐", curses.color_pair(3))
+            self.safe_addstr(
+                menu_y, menu_x, "┌" + "─" * (menu_width - 2) + "┐", curses.color_pair(3)
+            )
             # Sides
             for y in range(menu_y + 1, menu_y + menu_height - 1):
                 self.safe_addstr(y, menu_x, "│", curses.color_pair(8))
                 self.safe_addstr(y, menu_x + menu_width - 1, "│", curses.color_pair(8))
             # Bottom
-            self.safe_addstr(menu_y + menu_height - 1, menu_x, "└" + "─" * (menu_width - 2) + "┘", curses.color_pair(8))
-            
+            self.safe_addstr(
+                menu_y + menu_height - 1,
+                menu_x,
+                "└" + "─" * (menu_width - 2) + "┘",
+                curses.color_pair(8),
+            )
+
             # Title
             title = " ◈ SELECT STYLE "
             title_x = menu_x + (menu_width - len(title)) // 2
-            self.safe_addstr(menu_y, title_x, title, curses.color_pair(3) | curses.A_BOLD)
+            self.safe_addstr(
+                menu_y, title_x, title, curses.color_pair(3) | curses.A_BOLD
+            )
 
             # Subtitle line
             subtitle = f"{len(style_info)} styles available"
             self.safe_addstr(menu_y + 1, menu_x + 3, subtitle, curses.color_pair(8))
 
             # Divider after subtitle
-            self.safe_addstr(menu_y + 2, menu_x, "├" + "─" * (menu_width - 2) + "┤", curses.color_pair(8))
+            self.safe_addstr(
+                menu_y + 2,
+                menu_x,
+                "├" + "─" * (menu_width - 2) + "┤",
+                curses.color_pair(8),
+            )
 
             # Scroll indicators (on the divider lines)
             if scroll_offset > 0:
-                self.safe_addstr(menu_y + 2, menu_x + menu_width - 3, "▲", curses.color_pair(6) | curses.A_BOLD)
+                self.safe_addstr(
+                    menu_y + 2,
+                    menu_x + menu_width - 3,
+                    "▲",
+                    curses.color_pair(6) | curses.A_BOLD,
+                )
             if scroll_offset + visible_count < len(style_info):
-                self.safe_addstr(menu_y + 3 + visible_count, menu_x + menu_width - 3, "▼", curses.color_pair(6) | curses.A_BOLD)
+                self.safe_addstr(
+                    menu_y + 3 + visible_count,
+                    menu_x + menu_width - 3,
+                    "▼",
+                    curses.color_pair(6) | curses.A_BOLD,
+                )
 
             # List styles
             for i in range(visible_count):
@@ -1096,33 +1160,56 @@ class UltimateOscilloscope:
                 else:
                     key_label = chr(ord("a") + idx - 9)
 
-                is_selected = (idx == selected_idx)
-                is_current = (info["display"] == current_style)
+                is_selected = idx == selected_idx
+                is_current = info["display"] == current_style
 
                 # Clear the row first
                 self.safe_addstr(row, menu_x + 1, " " * (menu_width - 2), 0)
 
                 if is_selected:
                     # Selected: cyan arrow and bright text
-                    self.safe_addstr(row, menu_x + 2, "▸", curses.color_pair(3) | curses.A_BOLD)
-                    self.safe_addstr(row, menu_x + 4, key_label, curses.color_pair(6) | curses.A_BOLD)
+                    self.safe_addstr(
+                        row, menu_x + 2, "▸", curses.color_pair(3) | curses.A_BOLD
+                    )
+                    self.safe_addstr(
+                        row, menu_x + 4, key_label, curses.color_pair(6) | curses.A_BOLD
+                    )
                     self.safe_addstr(row, menu_x + 5, ".", curses.color_pair(3))
-                    self.safe_addstr(row, menu_x + 7, info["display"][:menu_width - 14], curses.color_pair(3) | curses.A_BOLD)
+                    self.safe_addstr(
+                        row,
+                        menu_x + 7,
+                        info["display"][: menu_width - 14],
+                        curses.color_pair(3) | curses.A_BOLD,
+                    )
                 else:
                     # Not selected: dimmer
                     self.safe_addstr(row, menu_x + 4, key_label, curses.color_pair(6))
                     self.safe_addstr(row, menu_x + 5, ".", curses.color_pair(8))
-                    name_color = curses.color_pair(1) if is_current else curses.color_pair(8)
-                    self.safe_addstr(row, menu_x + 7, info["display"][:menu_width - 14], name_color)
+                    name_color = (
+                        curses.color_pair(1) if is_current else curses.color_pair(8)
+                    )
+                    self.safe_addstr(
+                        row, menu_x + 7, info["display"][: menu_width - 14], name_color
+                    )
 
                 # Current style indicator
                 if is_current:
-                    self.safe_addstr(row, menu_x + menu_width - 4, "✓", curses.color_pair(1) | curses.A_BOLD)
+                    self.safe_addstr(
+                        row,
+                        menu_x + menu_width - 4,
+                        "✓",
+                        curses.color_pair(1) | curses.A_BOLD,
+                    )
 
             # Footer divider and hints
             footer_y = menu_y + 3 + visible_count
-            self.safe_addstr(footer_y, menu_x, "├" + "─" * (menu_width - 2) + "┤", curses.color_pair(8))
-            
+            self.safe_addstr(
+                footer_y,
+                menu_x,
+                "├" + "─" * (menu_width - 2) + "┤",
+                curses.color_pair(8),
+            )
+
             hints = "↑↓ Navigate  Enter Select  Esc Cancel"
             hint_x = menu_x + (menu_width - len(hints)) // 2
             self.safe_addstr(footer_y + 1, hint_x, hints, curses.color_pair(8))
@@ -1133,11 +1220,11 @@ class UltimateOscilloscope:
 
             if key == 27:  # ESC
                 break
-            elif key == curses.KEY_UP or key == ord('k'):
+            elif key == curses.KEY_UP or key == ord("k"):
                 selected_idx = max(0, selected_idx - 1)
                 if selected_idx < scroll_offset:
                     scroll_offset = selected_idx
-            elif key == curses.KEY_DOWN or key == ord('j'):
+            elif key == curses.KEY_DOWN or key == ord("j"):
                 selected_idx = min(len(style_info) - 1, selected_idx + 1)
                 if selected_idx >= scroll_offset + visible_count:
                     scroll_offset = selected_idx - visible_count + 1
@@ -1146,7 +1233,9 @@ class UltimateOscilloscope:
                 scroll_offset = max(0, scroll_offset - visible_count)
             elif key == curses.KEY_NPAGE:
                 selected_idx = min(len(style_info) - 1, selected_idx + visible_count)
-                scroll_offset = min(len(style_info) - visible_count, scroll_offset + visible_count)
+                scroll_offset = min(
+                    len(style_info) - visible_count, scroll_offset + visible_count
+                )
             elif key == 10 or key == curses.KEY_ENTER:  # Enter
                 if 0 <= selected_idx < len(style_info):
                     self.style = style_info[selected_idx]["module"]
@@ -1176,7 +1265,7 @@ class UltimateOscilloscope:
         """Show real-time configuration overlay with presets"""
         selected_idx = 0
         current_preset = None  # Track which preset is active
-        
+
         # Menu sizing - add room for presets
         menu_width = min(58, self.width - 4)
         menu_height = len(self.config_keys) + 8  # Extra rows for presets
@@ -1191,21 +1280,30 @@ class UltimateOscilloscope:
                 self.safe_addstr(y, menu_x, " " * menu_width, 0)
 
             # Draw box
-            self.safe_addstr(menu_y, menu_x, "┌" + "─" * (menu_width - 2) + "┐", curses.color_pair(6))
+            self.safe_addstr(
+                menu_y, menu_x, "┌" + "─" * (menu_width - 2) + "┐", curses.color_pair(6)
+            )
             for y in range(menu_y + 1, menu_y + menu_height - 1):
                 self.safe_addstr(y, menu_x, "│", curses.color_pair(8))
                 self.safe_addstr(y, menu_x + menu_width - 1, "│", curses.color_pair(8))
-            self.safe_addstr(menu_y + menu_height - 1, menu_x, "└" + "─" * (menu_width - 2) + "┘", curses.color_pair(8))
+            self.safe_addstr(
+                menu_y + menu_height - 1,
+                menu_x,
+                "└" + "─" * (menu_width - 2) + "┘",
+                curses.color_pair(8),
+            )
 
             # Title
             title = " ◈ CONFIGURATION "
             title_x = menu_x + (menu_width - len(title)) // 2
-            self.safe_addstr(menu_y, title_x, title, curses.color_pair(6) | curses.A_BOLD)
+            self.safe_addstr(
+                menu_y, title_x, title, curses.color_pair(6) | curses.A_BOLD
+            )
 
             # Preset buttons row
             preset_y = menu_y + 1
             self.safe_addstr(preset_y, menu_x + 3, "PRESETS:", curses.color_pair(8))
-            
+
             presets_display = [
                 ("1", "Phosphor", "phosphor"),
                 ("2", "EDM", "edm"),
@@ -1217,16 +1315,27 @@ class UltimateOscilloscope:
                 presets_display.append(("4", "Custom", "custom"))
             px = menu_x + 12
             for key_char, label, preset_name in presets_display:
-                is_active = (current_preset == preset_name)
-                self.safe_addstr(preset_y, px, f"[", curses.color_pair(8))
-                self.safe_addstr(preset_y, px + 1, key_char, curses.color_pair(6) | curses.A_BOLD)
+                is_active = current_preset == preset_name
+                self.safe_addstr(preset_y, px, "[", curses.color_pair(8))
+                self.safe_addstr(
+                    preset_y, px + 1, key_char, curses.color_pair(6) | curses.A_BOLD
+                )
                 self.safe_addstr(preset_y, px + 2, "]", curses.color_pair(8))
-                label_attr = curses.color_pair(1) | curses.A_BOLD if is_active else curses.color_pair(8)
+                label_attr = (
+                    curses.color_pair(1) | curses.A_BOLD
+                    if is_active
+                    else curses.color_pair(8)
+                )
                 self.safe_addstr(preset_y, px + 3, label, label_attr)
                 px += len(label) + 5
 
             # Divider after presets
-            self.safe_addstr(menu_y + 2, menu_x, "├" + "─" * (menu_width - 2) + "┤", curses.color_pair(8))
+            self.safe_addstr(
+                menu_y + 2,
+                menu_x,
+                "├" + "─" * (menu_width - 2) + "┤",
+                curses.color_pair(8),
+            )
 
             # Draw each setting
             for i, cfg_key in enumerate(self.config_keys):
@@ -1234,39 +1343,48 @@ class UltimateOscilloscope:
                 schema = self.CONFIG_SCHEMA[cfg_key]
                 default, min_val, max_val, step, name, desc = schema
                 current = self._get_config_value(cfg_key)
-                
-                is_selected = (i == selected_idx)
-                
+
+                is_selected = i == selected_idx
+
                 # Clear row
                 self.safe_addstr(row, menu_x + 1, " " * (menu_width - 2), 0)
-                
+
                 # Selection indicator
                 if is_selected:
-                    self.safe_addstr(row, menu_x + 2, "▸", curses.color_pair(6) | curses.A_BOLD)
+                    self.safe_addstr(
+                        row, menu_x + 2, "▸", curses.color_pair(6) | curses.A_BOLD
+                    )
                     name_attr = curses.color_pair(6) | curses.A_BOLD
                 else:
                     name_attr = curses.color_pair(8)
-                
+
                 # Setting name (shortened)
                 self.safe_addstr(row, menu_x + 4, name[:14], name_attr)
-                
+
                 # Value bar visualization
                 bar_x = menu_x + 19
                 bar_width = 18
-                
+
                 # Calculate fill percentage
                 value_range = max_val - min_val
                 fill_pct = (current - min_val) / value_range if value_range > 0 else 0
                 fill_chars = int(fill_pct * bar_width)
-                
+
                 # Draw bar background
                 self.safe_addstr(row, bar_x, "░" * bar_width, curses.color_pair(8))
-                
+
                 # Draw bar fill
                 if fill_chars > 0:
-                    bar_color = curses.color_pair(1) if is_selected else curses.color_pair(3)
-                    self.safe_addstr(row, bar_x, "█" * min(fill_chars, bar_width), bar_color | curses.A_BOLD)
-                
+                    bar_color = (
+                        curses.color_pair(1) if is_selected else curses.color_pair(3)
+                    )
+                    self.safe_addstr(
+                        row,
+                        bar_x,
+                        "█" * min(fill_chars, bar_width),
+                        bar_color | curses.A_BOLD,
+                    )
+
                 # Value display
                 if isinstance(current, float):
                     if current >= 100:
@@ -1282,8 +1400,13 @@ class UltimateOscilloscope:
 
             # Footer divider
             footer_y = menu_y + 3 + len(self.config_keys)
-            self.safe_addstr(footer_y, menu_x, "├" + "─" * (menu_width - 2) + "┤", curses.color_pair(8))
-            
+            self.safe_addstr(
+                footer_y,
+                menu_x,
+                "├" + "─" * (menu_width - 2) + "┤",
+                curses.color_pair(8),
+            )
+
             # Hints
             hints = "↑↓ ←→ Adjust  R Reset  W Save  Esc Close"
             hint_x = menu_x + (menu_width - len(hints)) // 2
@@ -1296,52 +1419,51 @@ class UltimateOscilloscope:
 
             if input_key == 27:  # ESC
                 break
-            elif input_key == curses.KEY_UP or input_key == ord('k'):
+            elif input_key == curses.KEY_UP or input_key == ord("k"):
                 selected_idx = max(0, selected_idx - 1)
-            elif input_key == curses.KEY_DOWN or input_key == ord('j'):
+            elif input_key == curses.KEY_DOWN or input_key == ord("j"):
                 selected_idx = min(len(self.config_keys) - 1, selected_idx + 1)
-            elif input_key == curses.KEY_LEFT or input_key == ord('h'):
+            elif input_key == curses.KEY_LEFT or input_key == ord("h"):
                 cfg_key = self.config_keys[selected_idx]
                 schema = self.CONFIG_SCHEMA[cfg_key]
                 step = schema[3]
                 current = self._get_config_value(cfg_key)
                 self._set_config_value(cfg_key, current - step)
                 current_preset = None  # Clear preset indicator
-            elif input_key == curses.KEY_RIGHT or input_key == ord('l'):
+            elif input_key == curses.KEY_RIGHT or input_key == ord("l"):
                 cfg_key = self.config_keys[selected_idx]
                 schema = self.CONFIG_SCHEMA[cfg_key]
                 step = schema[3]
                 current = self._get_config_value(cfg_key)
                 self._set_config_value(cfg_key, current + step)
                 current_preset = None
-            elif input_key in (ord('r'), ord('R')):
+            elif input_key in (ord("r"), ord("R")):
                 # Reset selected setting to default
                 cfg_key = self.config_keys[selected_idx]
                 default = self.CONFIG_SCHEMA[cfg_key][0]
                 self._set_config_value(cfg_key, default)
                 current_preset = None
-            elif input_key == ord('1'):
+            elif input_key == ord("1"):
                 self._load_preset("phosphor")
                 current_preset = "phosphor"
-            elif input_key == ord('2'):
+            elif input_key == ord("2"):
                 self._load_preset("edm")
                 current_preset = "edm"
-            elif input_key == ord('3'):
+            elif input_key == ord("3"):
                 self._load_preset("ambient")
                 current_preset = "ambient"
-            elif input_key == ord('0'):
+            elif input_key == ord("0"):
                 self._load_preset("default")
                 current_preset = "default"
-            elif input_key == ord('4'):
+            elif input_key == ord("4"):
                 # Load custom preset if it exists
                 if "custom" in self.PRESETS:
                     self._load_preset("custom")
                     current_preset = "custom"
-            elif input_key in (ord('w'), ord('W')):
+            elif input_key in (ord("w"), ord("W")):
                 # Save current settings as custom preset
                 self.PRESETS["custom"] = {
-                    key: self._get_config_value(key) 
-                    for key in self.config_keys
+                    key: self._get_config_value(key) for key in self.config_keys
                 }
                 current_preset = "custom"
 
@@ -1436,7 +1558,7 @@ class UltimateOscilloscope:
 def load_default_style():
     """Fallback to a known safe style (neon_wave or classic_wave)"""
     styles_dir = Path(__file__).parent / "styles"
-    
+
     # Try neon_wave first (newer, nicer default)
     for default_name in ["neon_wave", "classic_wave"]:
         style_path = styles_dir / f"{default_name}.py"
@@ -1448,7 +1570,7 @@ def load_default_style():
                 return module
             except Exception:
                 continue
-    
+
     print("CRITICAL: No default styles found!")
     sys.exit(1)
 

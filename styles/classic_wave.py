@@ -6,7 +6,7 @@ STYLE_NAME = "Classic Wave"
 STYLE_DESCRIPTION = "Traditional oscilloscope with clean sine waves"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with classic oscilloscope effect.
 

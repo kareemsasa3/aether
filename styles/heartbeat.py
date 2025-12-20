@@ -7,7 +7,7 @@ STYLE_NAME = "Heartbeat"
 STYLE_DESCRIPTION = "ECG medical monitor with cardiac rhythm"
 
 
-def render_waveform(i, amp, age, max_width, colors):
+def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     """
     Render waveform with ECG/heartbeat effect.
 
@@ -17,12 +17,14 @@ def render_waveform(i, amp, age, max_width, colors):
     if age >= 100:
         return None
 
+    # Use seeded random for stability
+    rng = random.Random(sample_id)
+
     intensity = abs(amp)
 
     # ECG-style characters
-    # Sharp peaks and valleys for that cardiac look
     if amp > 0.6:
-        char = "╱"  # Sharp rise (QRS complex)
+        char = "╱"  # Sharp rise
     elif amp > 0.3:
         char = "/"
     elif amp > 0.05:
@@ -34,18 +36,17 @@ def render_waveform(i, amp, age, max_width, colors):
     elif amp > -0.6:
         char = "╲"  # Sharp fall
     else:
-        char = "│"  # Deep valley (S wave)
+        char = "│"  # Deep valley
 
-    # Add ECG-specific peaks randomly for realism
+    # Add ECG-specific peaks randomly for realism (stable per sample)
     if intensity > 0.7:
-        char = random.choice(["▲", "△", "∧", "╱"])
+        char = rng.choice(["▲", "△", "∧", "╱"])
     elif intensity > 0.5 and amp < 0:
-        char = random.choice(["▼", "▽", "∨", "╲"])
+        char = rng.choice(["▼", "▽", "∨", "╲"])
 
     # Medical monitor green with red for critical peaks
     if age < 3 and intensity > 0.6:
-        # Critical peak - could flash red
-        attr = colors[4] | curses.A_BOLD  # Magenta for alert
+        attr = colors[4] | curses.A_BOLD  # Magenta alert
     elif age < 4:
         attr = colors[1] | curses.A_BOLD
     elif age < 8:
