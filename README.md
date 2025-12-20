@@ -4,8 +4,6 @@
 
 Aether is a high-performance audio analysis daemon that publishes live acoustic state to lock-free shared memory. It treats sound not as a stream to be watched, but as a **published contract** that any process can consume.
 
-![Aether Demo](assets/demo.gif)
-
 ## 📡 The Core Concept: Numbers as Infrastructure
 
 Aether is built on the philosophy of **ignorance as design**. The daemon captures audio via PipeWire, performs 7-band FFT analysis, and writes the results to a memory-mapped file. It has no knowledge of who is listening, and it never blocks for a consumer. This decoupling is an intentional constraint: any logic beyond audio analysis (triggers, webhooks, or processing) belongs at the edges, not in the core daemon.
