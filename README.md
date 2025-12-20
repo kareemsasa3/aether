@@ -117,6 +117,16 @@ _See the `integrations/` directory for reference implementations._
 - **Windowing**: Hann window applied per 2048-sample chunk.
 - **Spectrum**: 7-band logarithmic mapping (Sub-bass to Sparkle).
 
+## ❌ Non-Goals
+
+Aether intentionally does **not**:
+- Manage consumer lifecycle (that's systemd's job)
+- Provide beat detection (build it as a consumer)
+- Store historical data (it's a real-time state publisher)
+- Support multiple audio sources (configure PipeWire instead)
+
+These aren't missing features—they're respected boundaries.
+
 ---
 
 **Built with 🎵 for the Linux Desktop by Kareem**
