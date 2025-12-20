@@ -40,22 +40,38 @@ pip install -r requirements.txt  # if you create one
 
 ### Usage
 
-**1. Start the audio daemon:**
+**Quick Start (Recommended):**
 
 ```bash
-./aether_daemon.py
+# Start everything at once
+./aether-start.sh all
+
+# Or interactively choose what to start
+./aether-start.sh
 ```
 
-**2. Launch the visualizer:**
+**Manual Start:**
 
 ```bash
+# 1. Start the audio daemon (background)
+./aether_daemon.py &
+
+# 2. Launch the visualizer
 ./aether.py
+
+# 3. (Optional) Start RGB sync
+./aether_rgb.py &
 ```
 
-**3. (Optional) Start RGB sync:**
+**Launcher Commands:**
 
 ```bash
-./aether_rgb.py
+./aether-start.sh all      # Start daemon + visualizer + RGB
+./aether-start.sh daemon   # Start only audio daemon
+./aether-start.sh viz      # Start only visualizer
+./aether-start.sh rgb      # Start only RGB controller
+./aether-start.sh stop     # Stop all Aether processes
+./aether-start.sh status   # Show running processes
 ```
 
 ## ⌨️ Controls
@@ -125,30 +141,38 @@ Press `S` during playback to switch styles instantly!
 
 ## ⚙️ Configuration
 
-### Audio Input
+### Configuration File
 
-By default, Aether captures from the Razer Seiren X microphone. To change the audio source, edit `aether_daemon.py`:
+Aether includes a central configuration file (`aether_config.py`) for tuning all components:
 
 ```python
-# Line ~XX
-"--target", "YOUR_AUDIO_DEVICE_NAME_HERE",
+# Key settings you might want to adjust:
+RGB_BRIGHTNESS_BOOST = 2.5  # LED brightness (increase if too dim)
+RGB_DECAY_FACTOR = 0.85     # Fade speed (higher = slower fade)
+AUDIO_THRESHOLD = 0.05      # Sensitivity (lower = more sensitive)
 ```
 
-Find your device name:
+### Audio Input
+
+By default, Aether captures from your system's default microphone. To capture system audio (what you hear):
 
 ```bash
+# Find your audio monitor device
 pactl list sources | grep -E "Name:|Description:"
+
+# Look for a "monitor" source, then edit aether_daemon.py:
+# Add --target flag to the pw-record command
 ```
 
 ### RGB LED Mapping
 
-RGB sync assumes the following OpenRGB device layout:
+RGB sync auto-detects devices by type:
 
-- Device 0: Motherboard (300 LEDs)
-- Device 1-2: RAM sticks (5 LEDs each)
-- Device 3: Mouse logo (1 LED)
+- **Motherboard**: Spatial spectrum analyzer (all LEDs used)
+- **DRAM**: 5-band mini spectrum per stick
+- **Mouse**: Volume brightness indicator
 
-Edit `aether_rgb.py` to match your hardware configuration.
+The controller automatically distributes LEDs evenly across frequency bands, so it works with any LED count.
 
 ## 🎯 Performance
 
@@ -172,11 +196,18 @@ Edit `aether_rgb.py` to match your hardware configuration.
    systemctl --user status pipewire
    ```
 
-2. Verify audio device name in `aether_daemon.py`
-
-3. Test audio capture manually:
+2. Test audio capture manually:
    ```bash
-   pw-record --target YOUR_DEVICE test.wav
+   pw-record test.wav  # Uses default mic
+   # Play it back to verify
+   pw-play test.wav
+   ```
+
+3. For system audio (music/videos), create a loopback:
+   ```bash
+   # Find your output monitor
+   pactl list sources short | grep monitor
+   # Use that as --target in aether_daemon.py
    ```
 
 ### RGB LEDs not syncing

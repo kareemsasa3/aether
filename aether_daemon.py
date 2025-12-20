@@ -120,8 +120,13 @@ class AetherDaemon:
 
     def get_frequency_bands(self, audio_data):
         """Analyze audio into multiple frequency bands for rich spectrum"""
-        # Apply FFT
-        fft = np.fft.rfft(audio_data)
+        # Apply Hann window to reduce spectral leakage
+        # This prevents energy from bleeding between frequency bins
+        window = np.hanning(len(audio_data))
+        windowed_data = audio_data * window
+        
+        # Apply FFT to windowed data
+        fft = np.fft.rfft(windowed_data)
         fft_magnitude = np.abs(fft)
         freqs = np.fft.rfftfreq(len(audio_data), 1.0 / self.SAMPLE_RATE)
 

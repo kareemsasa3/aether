@@ -84,14 +84,45 @@ class AetherSharedMemory:
 
     def _init_shm(self):
         """Initialize or open the shared memory region."""
+        # Clean up any existing mapping first
+        if self._mm is not None:
+            try:
+                self._mm.close()
+            except Exception:
+                pass
+            self._mm = None
+        if self._fd is not None:
+            try:
+                os.close(self._fd)
+            except Exception:
+                pass
+            self._fd = None
+
         try:
             if self.is_writer:
-                # Writer creates/truncates the file
-                self._fd = os.open(
-                    self.shm_path, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o644
-                )
-                # Extend to required size
-                os.ftruncate(self._fd, SHM_SIZE)
+                # Writer creates the file if needed, but doesn't truncate existing
+                # This prevents race condition with active readers
+                file_exists = os.path.exists(self.shm_path)
+                
+                if file_exists:
+                    # Open existing file without truncation
+                    self._fd = os.open(self.shm_path, os.O_RDWR, 0o644)
+                    # Check if it's the right size
+                    current_size = os.fstat(self._fd).st_size
+                    if current_size != SHM_SIZE:
+                        # Wrong size, need to resize (rare edge case)
+                        os.ftruncate(self._fd, SHM_SIZE)
+                else:
+                    # Create new file
+                    self._fd = os.open(
+                        self.shm_path, os.O_RDWR | os.O_CREAT, 0o644
+                    )
+                    os.ftruncate(self._fd, SHM_SIZE)
+                
+                # Reset sequence on fresh start (write header with seq=0)
+                # This signals to readers that we're starting fresh
+                self.last_sequence = 0
+                
             else:
                 # Reader opens existing file (may not exist yet)
                 if not os.path.exists(self.shm_path):
@@ -101,6 +132,12 @@ class AetherSharedMemory:
             # Memory-map the file
             access = mmap.ACCESS_WRITE if self.is_writer else mmap.ACCESS_READ
             self._mm = mmap.mmap(self._fd, SHM_SIZE, access=access)
+            
+            # Writer: Initialize header on fresh file
+            if self.is_writer:
+                header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, 0, 0)
+                self._mm.seek(0)
+                self._mm.write(header)
 
         except (OSError, PermissionError) as e:
             if DEBUG:
@@ -191,7 +228,9 @@ class AetherSharedMemory:
                 return None
 
             # Check if this is new data (optimization)
-            if seq1 == 0 or seq1 <= self.last_sequence:
+            # Only skip if uninitialized (seq1 == 0) or if we've already read this exact sequence
+            # Changed from <= to == so we read ANY new sequence number, even if daemon skipped ahead
+            if seq1 == 0 or seq1 == self.last_sequence:
                 return None
 
             # Validate data length
