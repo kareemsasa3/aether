@@ -1,304 +1,125 @@
 # 🌊 Aether
 
-> _Where sound becomes light_
+> _Real-time audio attention infrastructure for Linux._
 
-A terminal-based audio visualizer with real-time frequency analysis and RGB LED synchronization. Watch your music ripple across your screen and illuminate your hardware.
+Aether is a high-performance audio analysis daemon that publishes live acoustic state to lock-free shared memory. It treats sound not as a stream to be watched, but as a **published contract** that any process can consume.
 
 ![Aether Demo](assets/demo.gif)
 
-## ✨ Features
+## 📡 The Core Concept: Numbers as Infrastructure
 
-- **🎵 Real-time audio analysis** - 7-band FFT processing via PipeWire
-- **🌊 Center-radiation waveforms** - Unique visual effect that radiates from the center
-- **💡 Hardware RGB sync** - Synchronize 300+ LEDs with your music via OpenRGB
-- **🎨 15+ visualization styles** - Hot-swappable styles with unique aesthetics
-- **⚡ Low latency** - Lock-free shared memory IPC (~20-100μs)
-- **🖥️ Terminal-native** - Works over SSH, no GUI required
-- **🎚️ Dual modes** - Oscilloscope and full-spectrum analyzer views
+Aether is built on the philosophy of **ignorance as design**. The daemon captures audio via PipeWire, performs 7-band FFT analysis, and writes the results to a memory-mapped file. It has no knowledge of who is listening, and it never blocks for a consumer. This decoupling is an intentional constraint: any logic beyond audio analysis (triggers, webhooks, or processing) belongs at the edges, not in the core daemon.
 
-## 🚀 Quick Start
-
-### Prerequisites
+The simplest way to interact with Aether isn't a GUI—it's a query:
 
 ```bash
-# Arch Linux
-sudo pacman -S python pipewire openrgb
+$ aether-query --band bass
+0.73
 
-# Ubuntu/Debian
-sudo apt install python3 pipewire openrgb
+$ aether-query --json
+{
+  "sub_bass": 0.12,
+  "bass": 0.73,
+  "mid": 0.45,
+  ...
+  "total": 0.58
+}
 ```
 
-### Installation
+This makes audio state **composable**. Use it for status bars, smart home triggers, or custom visualizations. Note that while the CLI provides JSON for convenience, the true contract is the shared memory layout and its monotonic sequence semantics.
+
+## 🏗️ Architecture: The Broadcast Model
+
+Unlike traditional visualizers where processing and rendering are coupled, Aether separates **analysis** (The Daemon) from **action** (The Consumers).
+
+```
+   [ PipeWire ]
+        ↓
+   [ Aether Daemon ] ──→ [ Shared Memory ] ←── [ YOUR SCRIPT ]
+                                ↓
+                 ┌──────────────┴──────────────┐
+                 ↓                             ↓
+        [ Terminal TUI ]              [ OpenRGB Controller ]
+        (Reference Viz)               (Physical Light Sync)
+```
+
+- **Publisher**: The Daemon writes to `/dev/shm/aether_audio_event` using Optimistic Concurrency Control (OCC).
+- **Contract**: A lock-free shared memory region (~20-100μs latency). Consumers detach, lag, or crash without ever affecting the analysis pipeline.
+- **Reference Consumers**:
+  - **TUI**: A curses-based visualizer with 15+ styles.
+  - **RGB**: A physical sync engine for 300+ LEDs via OpenRGB.
+
+## 🚀 Deployment
+
+Aether is designed to run as a **background infrastructure**.
+
+### 1. Install
 
 ```bash
 git clone https://github.com/kareemsasa3/aether.git
 cd aether
-python -m venv venv
-source venv/bin/activate  # or `venv/bin/activate` on Windows
-pip install -r requirements.txt  # if you create one
+./install-aether-client.sh  # Installs the CLI tool and library
 ```
 
-### Usage
+### 2. Run as Infrastructure (Recommended)
 
-**Quick Start (Recommended):**
+Install the daemon as a long-lived user service:
 
 ```bash
-# Start everything at once
-./aether-start.sh all
-
-# Or interactively choose what to start
-./aether-start.sh
+cd integrations/systemd
+./install.sh
+systemctl --user start aether-daemon
 ```
 
-**Manual Start:**
+### 3. Attach Consumers
+
+Now that the audio state is being published, attach any consumer at any time:
 
 ```bash
-# 1. Start the audio daemon (background)
-./aether_daemon.py &
-
-# 2. Launch the visualizer
-./aether.py
-
-# 3. (Optional) Start RGB sync
-./aether_rgb.py &
+./aether.py              # Launch the terminal visualizer
+./aether_rgb.py          # Start the hardware RGB sync
+aether-query --monitor   # Watch the raw data stream
 ```
 
-**Launcher Commands:**
+## ✨ Reference Visualizer Styles
 
-```bash
-./aether-start.sh all      # Start daemon + visualizer + RGB
-./aether-start.sh daemon   # Start only audio daemon
-./aether-start.sh viz      # Start only visualizer
-./aether-start.sh rgb      # Start only RGB controller
-./aether-start.sh stop     # Stop all Aether processes
-./aether-start.sh status   # Show running processes
-```
+The provided TUI (`aether.py`) includes 15+ "Reference Styles" demonstrating how to transform the shared memory data:
 
-## ⌨️ Controls
+- **Aurora** | **Matrix Rain** | **Cyberpunk** | **Glitch Art** | **Fire** | **Starfield**
+- _Toggle with `S` during playback._
 
-| Key   | Action                                       |
-| ----- | -------------------------------------------- |
-| `S`   | Switch visualization style                   |
-| `D`   | Toggle design mode (oscilloscope ↔ spectrum) |
-| `Q`   | Quit                                         |
-| `↑/↓` | Navigate style menu                          |
+## 📊 Performance by Design
 
-## 🎨 Visualization Styles
+- **Latency**: ~92ms end-to-end (Audio capture: 42ms, IPC: 0.05ms, Update: 50ms).
+- **Decoupled FPS**: The daemon processes at the audio chunk rate (~23Hz), while the TUI renders at 30 FPS and individual RGB zones update at 20 FPS.
+- **Resilience**: If the visualizer lags, the daemon doesn't care. If the daemon crashes, consumers safely read stale data or exit gracefully.
 
-Aether includes 15 unique visualization styles:
+## 🛠️ Integration & Extensions
 
-- **Aurora** - Northern lights effect with color waves
-- **Classic Wave** - Clean oscilloscope aesthetic
-- **Cyberpunk** - Neon-soaked future vibes
-- **Data Stream** - Matrix-inspired data flow
-- **Dense Fade** - Layered transparency effects
-- **Fire** - Flame-like energy visualization
-- **Geometric** - Sharp angles and patterns
-- **Glitch Art** - Digital corruption aesthetic
-- **Heartbeat** - Pulsing organic rhythm
-- **Matrix Rain** - Falling code columns
-- **Minimalist** - Clean and simple
-- **Neon Pulse** - Electric glow effects
-- **Pixel Art** - Retro 8-bit style
-- **Rain Drops** - Liquid motion trails
-- **Starfield** - Space-themed particles
+Because the state is published to shared memory, you can tap into it with zero overhead:
 
-Press `S` during playback to switch styles instantly!
+- **Polybar/i3**: Show live bass levels in your status bar.
+- **Dunst**: Auto-pause notifications during high-energy music drops.
+- **OBS**: Auto-duck microphone volume when music energy peaks.
+- **Smart Home**: Sync Philips Hue lights to the "sparkle" band for ambient air.
 
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│  PipeWire Audio Capture                     │
-├─────────────────────────────────────────────┤
-│  FFT Analysis (7 frequency bands)           │
-│  • Sub-bass  (20-60 Hz)                     │
-│  • Bass      (60-250 Hz)                    │
-│  • Low-mid   (250-500 Hz)                   │
-│  • Mid       (500-1000 Hz)                  │
-│  • High-mid  (1000-2000 Hz)                 │
-│  • Treble    (2000-4000 Hz)                 │
-│  • Sparkle   (4000-8000 Hz)                 │
-├─────────────────────────────────────────────┤
-│  Shared Memory IPC (lock-free)              │
-│  ~20-100μs latency                          │
-├─────────────────────────────────────────────┤
-│  Curses TUI Visualizer (30 FPS)             │
-│  Center-radiating waveform display          │
-├─────────────────────────────────────────────┤
-│  OpenRGB LED Controller (20 FPS)            │
-│  Traveling wave effect across 311 LEDs      │
-└─────────────────────────────────────────────┘
-```
-
-### Components
-
-- **`aether_daemon.py`** - Audio capture and FFT analysis
-- **`aether.py`** - Terminal visualizer with curses
-- **`aether_rgb.py`** - RGB LED synchronization via OpenRGB
-- **`aether_shm.py`** - Lock-free shared memory IPC
-- **`styles/`** - Pluggable visualization style modules
-
-## ⚙️ Configuration
-
-### Configuration File
-
-Aether includes a central configuration file (`aether_config.py`) for tuning all components:
-
-```python
-# Key settings you might want to adjust:
-RGB_BRIGHTNESS_BOOST = 2.5  # LED brightness (increase if too dim)
-RGB_DECAY_FACTOR = 0.85     # Fade speed (higher = slower fade)
-AUDIO_THRESHOLD = 0.05      # Sensitivity (lower = more sensitive)
-```
-
-### Audio Input
-
-By default, Aether captures from your system's default microphone. To capture system audio (what you hear):
-
-```bash
-# Find your audio monitor device
-pactl list sources | grep -E "Name:|Description:"
-
-# Look for a "monitor" source, then edit aether_daemon.py:
-# Add --target flag to the pw-record command
-```
-
-### RGB LED Mapping
-
-RGB sync auto-detects devices by type:
-
-- **Motherboard**: Spatial spectrum analyzer (all LEDs used)
-- **DRAM**: 5-band mini spectrum per stick
-- **Mouse**: Volume brightness indicator
-
-The controller automatically distributes LEDs evenly across frequency bands, so it works with any LED count.
-
-## 🎯 Performance
-
-- **Latency**: ~92ms end-to-end (imperceptible)
-  - Audio capture: ~42ms
-  - Shared memory: ~0.05ms
-  - RGB update: ~50ms
-- **Frame rates**:
-  - Visualizer: 30 FPS (stable)
-  - RGB controller: 20 FPS
-- **CPU usage**: ~5-10% on modern systems
-- **Memory**: ~50MB total
-
-## 🐛 Troubleshooting
-
-### No audio visualization
-
-1. Check that PipeWire is running:
-
-   ```bash
-   systemctl --user status pipewire
-   ```
-
-2. Test audio capture manually:
-   ```bash
-   pw-record test.wav  # Uses default mic
-   # Play it back to verify
-   pw-play test.wav
-   ```
-
-3. For system audio (music/videos), create a loopback:
-   ```bash
-   # Find your output monitor
-   pactl list sources short | grep monitor
-   # Use that as --target in aether_daemon.py
-   ```
-
-### RGB LEDs not syncing
-
-1. Ensure OpenRGB server is running:
-
-   ```bash
-   openrgb --server
-   ```
-
-2. Check device indices match your hardware:
-   ```bash
-   openrgb --list-devices
-   ```
-
-### Terminal rendering issues
-
-- Use a modern terminal (Kitty, Alacritty, iTerm2)
-- Ensure terminal supports 256 colors
-- Increase terminal font size if characters overlap
+_See the `integrations/` directory for reference implementations._
 
 ## 🧪 Technical Details
 
-### FFT Analysis
+### IPC Protocol (OCC)
 
-- **Sample rate**: 48 kHz
-- **Chunk size**: 2048 samples (~42.7ms latency)
-- **Windowing**: Hann window for spectral leakage reduction
-- **Scaling**: Logarithmic energy mapping (0.0-1.0 normalized)
-
-### Shared Memory IPC
-
-- **Protocol**: Optimistic Concurrency Control (OCC)
 - **Format**: `[MAGIC:4][VERSION:4][SEQUENCE:8][LENGTH:4][JSON]`
-- **Location**: `/dev/shm/aether_audio_event` (tmpfs, RAM-backed)
-- **Fallback**: Legacy file-based IPC at `/tmp/aether_last_event.json`
+- **Location**: `/dev/shm/aether_audio_event` (RAM-backed tmpfs)
+- **Read Logic**: Check sequence number → read data → re-check sequence. If changed, retry (typically < 1% collision rate).
 
-### Waveform Rendering
+### Analysis Pipeline
 
-- **Style**: Center-radiation (dual deque system)
-- **Decay rate**: 0.98 (trails persist ~1.6s)
-- **Smoothing**: Exponential interpolation (factor: 0.3)
-- **Visual frequencies**: 2-20 Hz (mapped from audio bands)
-
-## 🤝 Contributing
-
-Contributions welcome! To add a new visualization style:
-
-1. Create `styles/your_style.py`
-2. Implement the `render_waveform()` function:
-
-   ```python
-   STYLE_NAME = "Your Style"
-   STYLE_DESCRIPTION = "Brief description"
-
-   def render_waveform(i, amp, age, max_width, colors):
-       """
-       Args:
-           i: Distance from center (0 = center)
-           amp: Amplitude (-1.0 to 1.0)
-           age: Age in frames (0 = newest)
-           max_width: Half-width available
-           colors: Dict of curses color pairs
-
-       Returns:
-           (char, color) tuple or None
-       """
-       # Your rendering logic here
-       return char, color
-   ```
-
-3. Test with `./aether.py --style=your_style`
-4. Submit a pull request!
-
-## 📜 License
-
-MIT License - see [LICENSE](LICENSE) for details
-
-## 🙏 Acknowledgments
-
-- Inspired by classic oscilloscopes and Milkdrop visualizations
-- Built with [PipeWire](https://pipewire.org/) for audio capture
-- RGB sync powered by [OpenRGB](https://openrgb.org/)
-- FFT analysis via NumPy/SciPy
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=kareemsasa3/aether&type=Date)](https://star-history.com/#kareemsasa3/aether&Date)
+- **Sample Rate**: 48 kHz (Mono)
+- **Windowing**: Hann window applied per 2048-sample chunk.
+- **Spectrum**: 7-band logarithmic mapping (Sub-bass to Sparkle).
 
 ---
 
-**Built with 🎵 by Kareem (https://github.com/kareemsasa3)**
-
-_"In the aether, sound and light become one."_
+**Built with 🎵 for the Linux Desktop by Kareem**
+_"In the aether, sound becomes a global variable."_

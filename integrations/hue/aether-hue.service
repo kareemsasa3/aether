@@ -1,0 +1,16 @@
+[Unit]
+Description=Aether Philips Hue Sync
+Documentation=https://github.com/kareem/aether
+After=aether-daemon.service network-online.target
+Wants=aether-daemon.service network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/code/aether/integrations/hue/aether-hue-sync.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

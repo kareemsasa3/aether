@@ -1,0 +1,20 @@
+[Unit]
+Description=Aether Notification Pauser
+Documentation=https://github.com/kareem/aether
+After=aether-daemon.service dunst.service
+Wants=aether-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/code/aether/integrations/dunst/aether-pause-daemon.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Ensure dunstctl is accessible
+Environment="DISPLAY=:0"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus"
+
+[Install]
+WantedBy=default.target

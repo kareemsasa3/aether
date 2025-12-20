@@ -1,0 +1,19 @@
+[Unit]
+Description=Aether Audio Analysis Daemon
+Documentation=https://github.com/kareem/aether
+After=pipewire.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kareem/code/aether
+ExecStart=/usr/bin/python3 /home/kareem/code/aether/aether_daemon.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Performance tuning
+Nice=-10
+
+[Install]
+WantedBy=default.target

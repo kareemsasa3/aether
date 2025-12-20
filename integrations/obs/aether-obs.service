@@ -1,0 +1,16 @@
+[Unit]
+Description=Aether OBS Auto-Ducking
+Documentation=https://github.com/kareem/aether
+After=aether-daemon.service
+Wants=aether-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/code/aether/integrations/obs/aether-obs-ducking.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

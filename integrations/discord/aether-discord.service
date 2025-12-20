@@ -1,0 +1,20 @@
+[Unit]
+Description=Aether Discord Rich Presence
+Documentation=https://github.com/kareemsasa3/aether
+After=aether-daemon.service
+Wants=aether-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/code/aether/integrations/discord/aether-discord-rpc.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Ensure Discord is available
+Environment="DISPLAY=:0"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus"
+
+[Install]
+WantedBy=default.target
