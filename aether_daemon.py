@@ -4,6 +4,7 @@ import subprocess
 import numpy as np
 import sys
 import signal
+import time
 import math
 from aether_shm import AetherSharedMemory, write_event_legacy
 
@@ -220,9 +221,23 @@ class AetherDaemon:
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 bufsize=self.CHUNK_SIZE * 2,  # 2 bytes per sample
             )
+
+            # Give pw-record a moment to fail if no source is available
+            time.sleep(0.3)
+            if self.process.poll() is not None:
+                stderr_out = self.process.stderr.read().decode(errors="replace").strip()
+                if "no target node available" in stderr_out:
+                    print("[Audio Daemon V3] ERROR: No PipeWire input source available.")
+                    print("[Audio Daemon V3] Plug in or select a microphone, then retry.")
+                else:
+                    print(f"[Audio Daemon V3] ERROR: pw-record exited (code {self.process.returncode})")
+                    if stderr_out:
+                        for line in stderr_out.splitlines()[:5]:
+                            print(f"  {line}")
+                return 1
 
             print("🎤 Listening to default microphone!")
             print("Play music, talk, whistle, sing!")
@@ -236,7 +251,13 @@ class AetherDaemon:
                 raw_data = self.process.stdout.read(bytes_to_read)
 
                 if len(raw_data) < bytes_to_read:
-                    break  # End of stream
+                    # Stream ended — check if pw-record failed
+                    rc = self.process.wait()
+                    if rc != 0:
+                        stderr_out = self.process.stderr.read().decode(errors="replace").strip()
+                        if stderr_out:
+                            print(f"\n[Audio Daemon V3] pw-record error: {stderr_out}")
+                    break
 
                 # Convert bytes to numpy array
                 audio_data = np.frombuffer(raw_data, dtype=np.int16)
@@ -271,16 +292,19 @@ class AetherDaemon:
             import traceback
 
             traceback.print_exc()
+            return 1
         finally:
             if hasattr(self, "process"):
-                self.process.terminate()
+                if self.process.poll() is None:
+                    self.process.terminate()
                 self.process.wait()
             print("\n[Audio Daemon V3] Stopped.")
+        return 0
 
 
 def main():
     daemon = AetherDaemon()
-    daemon.run()
+    sys.exit(daemon.run())
 
 
 if __name__ == "__main__":

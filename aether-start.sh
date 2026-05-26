@@ -71,11 +71,12 @@ start_daemon_bg() {
     echo -e "${GREEN}▶ Starting audio daemon (background)...${NC}"
     nohup python3 aether_daemon.py > "$LOG_DIR/daemon.log" 2>&1 &
     echo $! > "$LOG_DIR/daemon.pid"
-    sleep 0.3
+    sleep 1
     if pgrep -f "aether_daemon.py" > /dev/null; then
         echo -e "  ${GREEN}✓${NC} PID: $(cat "$LOG_DIR/daemon.pid") → Logs: $LOG_DIR/daemon.log"
     else
-        echo -e "  ${RED}✗ Failed to start. Check $LOG_DIR/daemon.log${NC}"
+        echo -e "  ${RED}✗ Daemon failed to start:${NC}"
+        tail -4 "$LOG_DIR/daemon.log" 2>/dev/null | sed 's/^/    /'
     fi
 }
 
