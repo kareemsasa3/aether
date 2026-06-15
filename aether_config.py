@@ -98,3 +98,6 @@ FREQUENCY_BANDS = {
     "sparkle": (4000, 8000),
 }
 
+# Low-to-high band order for spatial spectrum mapping (matches FREQUENCY_BANDS)
+BAND_ORDER = ["sub_bass", "bass", "low_mid", "mid", "high_mid", "treble", "sparkle"]
+

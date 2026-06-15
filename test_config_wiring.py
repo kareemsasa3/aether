@@ -76,6 +76,16 @@ def test_rgb_sources_constants_from_config():
     # FRAME_TIME is derived from the config-backed FPS.
     assert r.FRAME_TIME == 1.0 / config.RGB_FPS
 
+    # Color/band maps source from config (verbatim for colors and full order;
+    # RAM mapping is a controller-local band selection painted with config
+    # colors).
+    assert r.BAND_COLORS == config.BAND_COLORS
+    assert r.BAND_ORDER == config.BAND_ORDER
+    assert r.RAM_BANDS == ["sub_bass", "bass", "mid", "high_mid", "treble"]
+    assert r.RAM_BAND_MAPPING == [
+        (band, config.BAND_COLORS[band]) for band in r.RAM_BANDS
+    ]
+
     # The silence threshold itself (int(config.RGB_SILENCE_THRESHOLD *
     # TARGET_FPS)) is computed as a local inside AetherRGB.run(), which can't be
     # invoked without a live OpenRGB connection. We assert its inputs are

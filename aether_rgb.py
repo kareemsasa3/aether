@@ -23,27 +23,15 @@ class AetherRGB:
     BRIGHTNESS_BOOST = config.RGB_BRIGHTNESS_BOOST
 
     # Band to color mapping for spectrum visualization
-    BAND_COLORS = {
-        "sub_bass": (75, 0, 130),  # Deep purple (Indigo)
-        "bass": (138, 43, 226),  # Blue-violet
-        "low_mid": (0, 0, 255),  # Blue
-        "mid": (0, 255, 255),  # Cyan
-        "high_mid": (0, 255, 0),  # Green
-        "treble": (255, 255, 0),  # Yellow
-        "sparkle": (255, 140, 0),  # Orange
-    }
+    BAND_COLORS = config.BAND_COLORS
 
     # Band order for spatial mapping
-    BAND_ORDER = ["sub_bass", "bass", "low_mid", "mid", "high_mid", "treble", "sparkle"]
+    BAND_ORDER = config.BAND_ORDER
 
-    # RAM spectrum: 5 bands mapped to 5 LEDs
-    RAM_BAND_MAPPING = [
-        ("sub_bass", (75, 0, 130)),
-        ("bass", (138, 43, 226)),
-        ("mid", (0, 255, 255)),
-        ("high_mid", (0, 255, 0)),
-        ("treble", (255, 255, 0)),
-    ]
+    # RAM spectrum: 5 bands mapped to 5 LEDs (controller/layout-specific
+    # selection of which bands light the RAM sticks); colors come from config.
+    RAM_BANDS = ["sub_bass", "bass", "mid", "high_mid", "treble"]
+    RAM_BAND_MAPPING = [(band, config.BAND_COLORS[band]) for band in RAM_BANDS]
 
     def __init__(self):
         # OpenRGB connection with retry
