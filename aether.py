@@ -11,6 +11,7 @@ from aether_shm import AetherSharedMemory, read_event_legacy
 import aether_config as config
 from ui import overlays
 from config_model import VizConfig
+import render
 
 
 class UltimateOscilloscope:
@@ -30,7 +31,6 @@ class UltimateOscilloscope:
         self.stdscr = stdscr
         curses.curs_set(0)
         self.stdscr.nodelay(True)
-        curses.use_default_colors()
 
         # Configurable settings now live in the config model.
         self.config_model = VizConfig()
@@ -38,32 +38,8 @@ class UltimateOscilloscope:
         # Config menu state
         self.config_keys = self.config_model.keys
 
-        # Enhanced color palette
-        # Using 256-color mode if available for richer colors
-        if curses.can_change_color() and curses.COLORS >= 256:
-            # Custom colors for a more vibrant look
-            curses.init_pair(1, 46, -1)  # Bright green (neon)
-            curses.init_pair(2, 22, -1)  # Dim green (forest)
-            curses.init_pair(3, 51, -1)  # Cyan (electric)
-            curses.init_pair(4, 201, -1)  # Magenta (hot pink)
-            curses.init_pair(5, 33, -1)  # Blue (deep)
-            curses.init_pair(6, 226, -1)  # Yellow (gold)
-            curses.init_pair(7, 208, -1)  # Orange (amber)
-            curses.init_pair(8, 245, -1)  # Gray (subtle)
-            curses.init_pair(9, 196, -1)  # Red (hot)
-            curses.init_pair(10, 129, -1)  # Purple (violet)
-        else:
-            # Fallback to basic 8 colors
-            curses.init_pair(1, curses.COLOR_GREEN, -1)
-            curses.init_pair(2, curses.COLOR_GREEN, -1)
-            curses.init_pair(3, curses.COLOR_CYAN, -1)
-            curses.init_pair(4, curses.COLOR_MAGENTA, -1)
-            curses.init_pair(5, curses.COLOR_BLUE, -1)
-            curses.init_pair(6, curses.COLOR_YELLOW, -1)
-            curses.init_pair(7, curses.COLOR_YELLOW, -1)  # Orange fallback
-            curses.init_pair(8, curses.COLOR_WHITE, -1)  # Gray fallback
-            curses.init_pair(9, curses.COLOR_RED, -1)
-            curses.init_pair(10, curses.COLOR_MAGENTA, -1)
+        # Initialize the curses color palette (256-color with 8-color fallback).
+        render.init_colors()
 
         # State Initialization
         self.design_mode = "OSCILLOSCOPE"  # Options: "OSCILLOSCOPE", "SPECTRUM"
@@ -242,23 +218,14 @@ class UltimateOscilloscope:
         self.frame_count = 0
         self.last_fps_time = time.time()
 
+    # Thin delegators to render.py. Kept as methods so the many self./viz.
+    # call sites (draw methods and the overlays) stay unchanged this phase.
     def get_bg_char(self, y, x):
         """Get the background character for a given coordinate"""
-        center_y = self.waveform_start + (self.waveform_height // 2)
-
-        # Center Line Only
-        if y == center_y:
-            return "─", curses.color_pair(2)  # Dim green
-
-        return " ", 0
+        return render.get_bg_char(self.waveform_start, self.waveform_height, y, x)
 
     def safe_addstr(self, y, x, text, attr=0):
-        try:
-            if 0 <= y < self.height and 0 <= x < self.width:
-                text = str(text)[: self.width - x - 1]
-                self.stdscr.addstr(y, x, text, attr)
-        except curses.error:
-            pass
+        render.safe_addstr(self.stdscr, self.height, self.width, y, x, text, attr)
 
     def draw_static_elements(self):
         """Draw static UI elements with modern aesthetic"""

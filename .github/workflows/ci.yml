@@ -32,11 +32,13 @@ jobs:
           aether_rgb.py
           aether.py
           config_model.py
+          render.py
           ui/__init__.py
           ui/overlays.py
           test_config_wiring.py
           test_aether_shm_seqlock.py
           test_config_model.py
+          test_render.py
 
       - name: Seqlock protocol tests (direct)
         run: python test_aether_shm_seqlock.py
@@ -47,5 +49,8 @@ jobs:
       - name: Config model tests (direct)
         run: python test_config_model.py
 
+      - name: Render primitive tests (direct)
+        run: python test_render.py
+
       - name: Test suite (pytest)
-        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py -q
+        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py test_render.py -q
