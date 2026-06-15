@@ -7,6 +7,7 @@ import signal
 import time
 import math
 from aether_shm import AetherSharedMemory, write_event_legacy
+import aether_config as config
 
 
 class AetherDaemon:
@@ -15,11 +16,11 @@ class AetherDaemon:
     # AUDIO PROCESSING CONSTANTS
     # ==========================================================================
 
-    # FFT/Buffer settings
+    # FFT/Buffer settings (tunable in aether_config.py).
     # 2048 samples @ 48kHz = ~42.7ms latency, good balance of frequency resolution
     # vs responsiveness. Larger = better bass resolution, smaller = faster response.
-    CHUNK_SIZE = 2048
-    SAMPLE_RATE = 48000  # Standard professional audio rate, matches PipeWire default
+    CHUNK_SIZE = config.CHUNK_SIZE
+    SAMPLE_RATE = config.SAMPLE_RATE  # Hz, matches PipeWire default
 
     # --------------------------------------------------------------------------
     # Amplitude Thresholds
@@ -43,29 +44,21 @@ class AetherDaemon:
     #   - Quiet audio: log10(100K) ≈ 5.0 → maps to 0.0
     #   - Loud audio:  log10(10M)  ≈ 7.0 → maps to 1.0
     #   - Formula: normalized = (log_energy - 5.0) / 2.0
-    LOG_ENERGY_MIN_BAND = 5.5  # log10 floor for individual frequency bands
-    LOG_ENERGY_RANGE_BAND = 2.0  # log10 range (7.0 - 5.0 = 2.0)
+    LOG_ENERGY_MIN_BAND = config.LOG_ENERGY_MIN_BAND  # log10 floor for bands
+    LOG_ENERGY_RANGE_BAND = config.LOG_ENERGY_RANGE_BAND  # log10 range
 
     # For total energy (sum of all bands):
     #   - Higher baseline because summing 7 bands yields higher total
     #   - log10(1M) = 6.0 floor, log10(100M) = 8.0 ceiling
-    LOG_ENERGY_MIN_TOTAL = 6.0  # log10 floor for total energy
-    LOG_ENERGY_RANGE_TOTAL = 2.0  # log10 range (8.0 - 6.0 = 2.0)
+    LOG_ENERGY_MIN_TOTAL = config.LOG_ENERGY_MIN_TOTAL  # log10 floor for total
+    LOG_ENERGY_RANGE_TOTAL = config.LOG_ENERGY_RANGE_TOTAL  # log10 range
 
     # --------------------------------------------------------------------------
-    # Frequency Band Definitions (Hz)
+    # Frequency Band Definitions (Hz) — defined in aether_config.py
     # --------------------------------------------------------------------------
     # Based on standard audio engineering frequency ranges.
     # Each band captures distinct musical/voice characteristics.
-    FREQUENCY_BANDS = {
-        "sub_bass": (20, 60),  # Deep rumble, sub-woofer territory
-        "bass": (60, 250),  # Kick drums, bass guitar fundamentals
-        "low_mid": (250, 500),  # Low vocals, guitar body, warmth
-        "mid": (500, 1000),  # Main vocals, most instruments
-        "high_mid": (1000, 2000),  # Presence, vocal clarity, attack
-        "treble": (2000, 4000),  # Brightness, consonants, hi-hats
-        "sparkle": (4000, 8000),  # Air, cymbals, sibilance
-    }
+    FREQUENCY_BANDS = config.FREQUENCY_BANDS
 
     # Human hearing range used for total energy calculation
     AUDIBLE_FREQ_MIN = 20  # Lower limit of human hearing
@@ -271,8 +264,8 @@ class AetherDaemon:
                 if self.DEBUG:
                     print(f"[DEBUG] Total: {total:.3f} | Bands: {bands}")
 
-                # Only process if above threshold
-                if total > 0.05:
+                # Only process if above threshold (configurable)
+                if total > config.AUDIO_THRESHOLD:
                     # Visual feedback
                     bar = "█" * int(total * 40)
                     top_bands = sorted(
