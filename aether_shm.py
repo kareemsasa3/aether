@@ -203,7 +203,12 @@ class AetherSharedMemory:
             self._mm.seek(LEN_OFFSET)
             self._mm.write(struct.pack("@I", data_len))
 
-            # 3. Commit (even) — a single atomic 64-bit store publishes the frame.
+            # 3. Commit (even). On x86-64 the 8-byte-aligned sequence lands as a
+            # single atomic 64-bit store, so this publishes the frame cleanly.
+            # Correctness does not depend on that, though: Python's mmap.write()
+            # makes no cross-platform atomicity promise, and the reader's seqlock
+            # retry (step 4 in read_event: seq1 == seq2, skip odd) rejects any
+            # torn read regardless of how the store decomposes on other targets.
             self._mm.seek(SEQ_OFFSET)
             self._mm.write(struct.pack("@Q", committed))
 

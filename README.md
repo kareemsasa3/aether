@@ -41,7 +41,7 @@ Unlike traditional visualizers where processing and rendering are coupled, Aethe
         (Reference Viz)               (Physical Light Sync)
 ```
 
-- **Publisher**: The Daemon writes to `/dev/shm/aether_audio_event` using Optimistic Concurrency Control (OCC).
+- **Publisher**: The Daemon writes to `/dev/shm/aether_audio_event` using a **seqlock** (a sequence-versioned, lock-free protocol).
 - **Contract**: A lock-free shared memory region (~20-100μs latency). Consumers detach, lag, or crash without ever affecting the analysis pipeline.
 - **Reference Consumers**:
   - **TUI**: A curses-based visualizer with 15+ styles.
@@ -105,11 +105,13 @@ _See the `integrations/` directory for reference implementations._
 
 ## 🧪 Technical Details
 
-### IPC Protocol (OCC)
+### IPC Protocol (Seqlock)
 
 - **Format**: `[MAGIC:4][VERSION:4][SEQUENCE:8][LENGTH:4][JSON]`
 - **Location**: `/dev/shm/aether_audio_event` (RAM-backed tmpfs)
-- **Read Logic**: Check sequence number → read data → re-check sequence. If changed, retry (typically < 1% collision rate).
+- **Write Logic**: Bump sequence to odd (write-in-progress) → write payload + length → bump to even (commit). Committed sequences are even; an odd value marks an in-flight write.
+- **Read Logic**: Read sequence (`seq1`) → read data → re-read sequence (`seq2`). The frame is consistent only if `seq1 == seq2` and `seq1` is even; otherwise skip and catch the next frame (typically < 1% collision rate).
+- **Atomicity**: The sequence field is 8-byte aligned, so the commit lands as a single aligned 64-bit store — atomic on x86-64. Correctness does **not** rest on that alone: the reader's seqlock retry (the `seq1 == seq2` check plus the odd-sequence skip) detects and rejects torn reads regardless of platform store semantics, so the guarantee does not depend on any cross-platform atomicity promise from Python's `mmap.write()`.
 
 ### Analysis Pipeline
 
