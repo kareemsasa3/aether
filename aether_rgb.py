@@ -6,20 +6,21 @@ import signal
 from openrgb import OpenRGBClient
 from openrgb.utils import RGBColor
 from aether_shm import AetherSharedMemory, read_event_legacy
+import aether_config as config
 
 
 class AetherRGB:
     """RGB controller with traveling wave effect for individual LEDs"""
 
     # Target FPS for RGB updates (higher = smoother but more CPU)
-    TARGET_FPS = 30
+    TARGET_FPS = config.RGB_FPS
     FRAME_TIME = 1.0 / TARGET_FPS
 
     # Decay factor for smooth fade-out (0.0-1.0, higher = slower fade)
-    DECAY_FACTOR = 0.85
+    DECAY_FACTOR = config.RGB_DECAY_FACTOR
 
     # Brightness multiplier (consistent across all devices)
-    BRIGHTNESS_BOOST = 2.5
+    BRIGHTNESS_BOOST = config.RGB_BRIGHTNESS_BOOST
 
     # Band to color mapping for spectrum visualization
     BAND_COLORS = {
@@ -426,7 +427,7 @@ class AetherRGB:
         print("[RGB] Press Ctrl+C to stop\n")
 
         frames_without_event = 0
-        silence_threshold_frames = int(0.1 * self.TARGET_FPS)  # 100ms worth of frames
+        silence_threshold_frames = int(config.RGB_SILENCE_THRESHOLD * self.TARGET_FPS)  # 100ms worth of frames
 
         try:
             while True:
