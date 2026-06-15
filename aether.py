@@ -10,6 +10,7 @@ from collections import deque
 from aether_shm import AetherSharedMemory, read_event_legacy
 import aether_config as config
 from ui import overlays
+from config_model import VizConfig
 
 
 class UltimateOscilloscope:
@@ -19,63 +20,11 @@ class UltimateOscilloscope:
     BURST_WIDTH_RATIO = 0.6
     SPECTRUM_DECAY_LEGACY = 0.8
 
-    # Configurable settings with their ranges: (default, min, max, step, name, description)
-    CONFIG_SCHEMA = {
-        "samples_per_frame": (2, 1, 8, 1, "Scroll Speed", "Animation speed"),
-        "waveform_decay": (
-            config.WAVEFORM_DECAY,
-            0.90,
-            0.999,
-            0.005,
-            "Trail Length",
-            "Trail persistence",
-        ),
-        "spectrum_decay": (config.SPECTRUM_DECAY, 0.70, 0.99, 0.02, "Spectrum Decay", "Bar fade speed"),
-        "rgb_decay": (0.85, 0.50, 0.95, 0.05, "RGB Decay", "RGB fade speed"),
-        "smooth_factor": (config.SMOOTH_FACTOR, 0.05, 0.8, 0.05, "Smoothing", "Transition smoothness"),
-        "intensity": (1.0, 0.5, 2.0, 0.1, "Intensity", "Amplitude boost"),
-        "virtual_sample_rate": (500, 200, 1000, 50, "Wave Detail", "Wave resolution"),
-    }
-
-    # Presets: name -> {setting: value}
-    PRESETS = {
-        "phosphor": {
-            "samples_per_frame": 1,
-            "waveform_decay": 0.993,
-            "spectrum_decay": 0.96,
-            "rgb_decay": 0.91,
-            "smooth_factor": 0.45,
-            "intensity": 1.0,
-            "virtual_sample_rate": 400,
-        },
-        "edm": {
-            "samples_per_frame": 3,
-            "waveform_decay": 0.96,
-            "spectrum_decay": 0.87,
-            "rgb_decay": 0.80,
-            "smooth_factor": 0.25,
-            "intensity": 1.3,
-            "virtual_sample_rate": 600,
-        },
-        "ambient": {
-            "samples_per_frame": 1,
-            "waveform_decay": 0.997,
-            "spectrum_decay": 0.94,
-            "rgb_decay": 0.88,
-            "smooth_factor": 0.60,
-            "intensity": 0.8,
-            "virtual_sample_rate": 350,
-        },
-        "default": {
-            "samples_per_frame": 2,
-            "waveform_decay": config.WAVEFORM_DECAY,
-            "spectrum_decay": config.SPECTRUM_DECAY,
-            "rgb_decay": 0.85,
-            "smooth_factor": config.SMOOTH_FACTOR,
-            "intensity": 1.0,
-            "virtual_sample_rate": 500,
-        },
-    }
+    # Config schema and presets now live in config_model. Kept here as
+    # class-level references so the (still viz-driven) config overlay can read
+    # them via the instance unchanged; VizConfig owns the actual values.
+    CONFIG_SCHEMA = VizConfig.CONFIG_SCHEMA
+    PRESETS = VizConfig.PRESETS
 
     def __init__(self, stdscr, style_module):
         self.stdscr = stdscr
@@ -83,11 +32,11 @@ class UltimateOscilloscope:
         self.stdscr.nodelay(True)
         curses.use_default_colors()
 
-        # Initialize configurable settings from schema
-        self._init_config()
+        # Configurable settings now live in the config model.
+        self.config_model = VizConfig()
 
         # Config menu state
-        self.config_keys = list(self.CONFIG_SCHEMA.keys())
+        self.config_keys = self.config_model.keys
 
         # Enhanced color palette
         # Using 256-color mode if available for richer colors
@@ -164,7 +113,6 @@ class UltimateOscilloscope:
         self.target_amp = 0.0
         self.smooth_amp = 0.0
         self.sample_count = 0
-        self.RATE = self.virtual_sample_rate  # Use configurable value
 
         # Calculate Layout (depends on state above)
         self.recalculate_layout()
@@ -172,40 +120,20 @@ class UltimateOscilloscope:
         # Draw static elements (depends on layout)
         self.draw_static_elements()
 
-    def _init_config(self):
-        """Initialize configurable settings from schema defaults"""
-        for key, (
-            default,
-            min_val,
-            max_val,
-            step,
-            name,
-            desc,
-        ) in self.CONFIG_SCHEMA.items():
-            setattr(self, key, default)
-
+    # The config helpers below delegate to self.config_model. They remain on
+    # the oscilloscope so the (still viz-driven) config overlay can call them
+    # unchanged; migrating the overlay to use VizConfig directly is deferred.
     def _get_config_value(self, key):
         """Get current value of a config setting"""
-        return getattr(self, key, self.CONFIG_SCHEMA[key][0])
+        return self.config_model.get(key)
 
     def _set_config_value(self, key, value):
         """Set a config value, clamping to valid range"""
-        schema = self.CONFIG_SCHEMA[key]
-        min_val, max_val = schema[1], schema[2]
-        clamped = max(min_val, min(max_val, value))
-        setattr(self, key, clamped)
-
-        # Update derived values if needed
-        if key == "virtual_sample_rate":
-            self.RATE = clamped
+        self.config_model.set(key, value)
 
     def _load_preset(self, preset_name):
         """Load a configuration preset"""
-        if preset_name in self.PRESETS:
-            for key, value in self.PRESETS[preset_name].items():
-                self._set_config_value(key, value)
-            return True
-        return False
+        return self.config_model.apply_preset(preset_name)
 
     def recalculate_layout(self):
         """Update dimensions and buffers on resize"""
@@ -477,7 +405,7 @@ class UltimateOscilloscope:
 
                 # Calculate a stable sample_id that stays with the sample as it radiates.
                 # This prevents flickering in styles that use randomness.
-                sample_id = i - int(age * self.samples_per_frame)
+                sample_id = i - int(age * self.config_model.samples_per_frame)
 
                 result = self.style.render_waveform(
                     i, amp, age, self.graph_width // 2, colors, sample_id
@@ -507,7 +435,7 @@ class UltimateOscilloscope:
                     self.last_ys[idx] = y
 
                 # Calculate stable sample_id
-                sample_id = i - int(age * self.samples_per_frame)
+                sample_id = i - int(age * self.config_model.samples_per_frame)
 
                 result = self.style.render_waveform(
                     i, amp, age, self.graph_width // 2, colors, sample_id
@@ -897,19 +825,19 @@ class UltimateOscilloscope:
         """
         # Smooth interpolation toward target amplitude
         # Apply intensity multiplier to target amplitude
-        boosted_target = min(1.0, self.target_amp * self.intensity)
-        self.smooth_amp += (boosted_target - self.smooth_amp) * self.smooth_factor
+        boosted_target = min(1.0, self.target_amp * self.config_model.intensity)
+        self.smooth_amp += (boosted_target - self.smooth_amp) * self.config_model.smooth_factor
 
         # Smooth interpolation for RGB levels
-        self.bass_level += (self.target_bass - self.bass_level) * self.smooth_factor
-        self.mid_level += (self.target_mid - self.mid_level) * self.smooth_factor
+        self.bass_level += (self.target_bass - self.bass_level) * self.config_model.smooth_factor
+        self.mid_level += (self.target_mid - self.mid_level) * self.config_model.smooth_factor
         self.treble_level += (
             self.target_treble - self.treble_level
-        ) * self.smooth_factor
+        ) * self.config_model.smooth_factor
 
         # Add samples to BOTH halves (they radiate outward from center)
-        for _ in range(int(self.samples_per_frame)):
-            phase = 2 * math.pi * self.target_freq * self.sample_count / self.RATE
+        for _ in range(int(self.config_model.samples_per_frame)):
+            phase = 2 * math.pi * self.target_freq * self.sample_count / self.config_model.RATE
             sample = self.smooth_amp * math.sin(phase)
 
             # Push new samples to front of both deques (index 0 = center)
@@ -933,7 +861,7 @@ class UltimateOscilloscope:
         # Map audio bands to spectrum bins (12 bins, 7 bands)
         # Apply intensity multiplier for boosted reactivity
         for band, bins in self.BAND_TO_BINS.items():
-            value = min(1.0, bands.get(band, 0) * self.intensity)
+            value = min(1.0, bands.get(band, 0) * self.config_model.intensity)
             for bin_idx in bins:
                 self.spectrum_values[bin_idx] = value
 
@@ -947,7 +875,7 @@ class UltimateOscilloscope:
     def update_rgb_levels_from_bands(self, bands):
         """Update RGB preview targets from frequency bands"""
         # Apply intensity multiplier
-        intensity = self.intensity
+        intensity = self.config_model.intensity
 
         # Bass: sub_bass (Indigo) + bass (Violet) -> Purple/Magenta
         self.target_bass = min(
@@ -981,20 +909,20 @@ class UltimateOscilloscope:
 
         # Decay waveform amplitudes in both halves
         self.waveform_left = deque(
-            [v * self.waveform_decay for v in self.waveform_left], maxlen=half_width
+            [v * self.config_model.waveform_decay for v in self.waveform_left], maxlen=half_width
         )
         self.waveform_right = deque(
-            [v * self.waveform_decay for v in self.waveform_right], maxlen=half_width
+            [v * self.config_model.waveform_decay for v in self.waveform_right], maxlen=half_width
         )
 
         # Decay spectrum
-        self.spectrum_values = [v * self.spectrum_decay for v in self.spectrum_values]
+        self.spectrum_values = [v * self.config_model.spectrum_decay for v in self.spectrum_values]
 
         # Decay RGB targets (simulates silence if no new events arrive)
         # We decay targets so the smoothing logic naturally brings levels down
-        self.target_bass *= self.rgb_decay
-        self.target_mid *= self.rgb_decay
-        self.target_treble *= self.rgb_decay
+        self.target_bass *= self.config_model.rgb_decay
+        self.target_mid *= self.config_model.rgb_decay
+        self.target_treble *= self.config_model.rgb_decay
 
     def clear_waveform_area(self):
         """Clear only waveform pixels, restoring grid/background"""
