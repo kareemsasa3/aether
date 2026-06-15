@@ -48,7 +48,6 @@ class UltimateOscilloscope:
         self.state = VisualizerState()
 
         # Event tracking
-        self.event_file = "/tmp/aether_last_event.json"
         self.last_event_time = 0
 
         # Initialize Shared Memory Reader
