@@ -8,11 +8,12 @@ import importlib.util
 from pathlib import Path
 from collections import deque
 from aether_shm import AetherSharedMemory, read_event_legacy
+import aether_config as config
 
 
 class UltimateOscilloscope:
     # Static defaults
-    TARGET_FPS = 30
+    TARGET_FPS = config.VIZ_FPS
     DEBUG_MODE = False
     BURST_WIDTH_RATIO = 0.6
     SPECTRUM_DECAY_LEGACY = 0.8
@@ -21,16 +22,16 @@ class UltimateOscilloscope:
     CONFIG_SCHEMA = {
         "samples_per_frame": (2, 1, 8, 1, "Scroll Speed", "Animation speed"),
         "waveform_decay": (
-            0.98,
+            config.WAVEFORM_DECAY,
             0.90,
             0.999,
             0.005,
             "Trail Length",
             "Trail persistence",
         ),
-        "spectrum_decay": (0.92, 0.70, 0.99, 0.02, "Spectrum Decay", "Bar fade speed"),
+        "spectrum_decay": (config.SPECTRUM_DECAY, 0.70, 0.99, 0.02, "Spectrum Decay", "Bar fade speed"),
         "rgb_decay": (0.85, 0.50, 0.95, 0.05, "RGB Decay", "RGB fade speed"),
-        "smooth_factor": (0.3, 0.05, 0.8, 0.05, "Smoothing", "Transition smoothness"),
+        "smooth_factor": (config.SMOOTH_FACTOR, 0.05, 0.8, 0.05, "Smoothing", "Transition smoothness"),
         "intensity": (1.0, 0.5, 2.0, 0.1, "Intensity", "Amplitude boost"),
         "virtual_sample_rate": (500, 200, 1000, 50, "Wave Detail", "Wave resolution"),
     }
@@ -66,10 +67,10 @@ class UltimateOscilloscope:
         },
         "default": {
             "samples_per_frame": 2,
-            "waveform_decay": 0.98,
-            "spectrum_decay": 0.92,
+            "waveform_decay": config.WAVEFORM_DECAY,
+            "spectrum_decay": config.SPECTRUM_DECAY,
             "rgb_decay": 0.85,
-            "smooth_factor": 0.3,
+            "smooth_factor": config.SMOOTH_FACTOR,
             "intensity": 1.0,
             "virtual_sample_rate": 500,
         },
