@@ -186,6 +186,7 @@ class AetherDaemon:
             "bands": bands,
             "frequency": dominant_freq,
             "amplitude": max(total_energy, band_value),
+            "timestamp": time.time(),
         }
 
         # Try shared memory first, fall back to legacy file

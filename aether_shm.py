@@ -50,6 +50,12 @@ VERSION = 1
 HEADER_FORMAT = "@4sIQI"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
+# Byte offsets for atomic field-level writes, derived from the format so they
+# stay correct under native alignment. The sequence sits at an 8-byte-aligned
+# offset, so writing it is a single atomic 64-bit store on x86.
+SEQ_OFFSET = struct.calcsize("@4sI")   # 8:  after MAGIC + VERSION
+LEN_OFFSET = struct.calcsize("@4sIQ")  # 16: after MAGIC + VERSION + SEQUENCE
+
 # Maximum JSON payload size
 MAX_PAYLOAD_SIZE = SHM_SIZE - HEADER_SIZE
 
@@ -59,12 +65,14 @@ DEBUG = False
 
 class AetherSharedMemory:
     """
-    Lock-free shared memory for audio event IPC using Optimistic Concurrency Control.
+    Lock-free shared memory for audio event IPC using a seqlock.
 
     Protocol V1:
-    - Writer: Writes Data first, then updates Header (Sequence)
-    - Reader: Reads Header (Seq1), reads Data, reads Header (Seq2)
-    - If Seq1 == Seq2, data is consistent.
+    - Committed sequence numbers are EVEN; an ODD sequence marks a write in
+      progress, so readers skip it rather than latch torn data.
+    - Writer: bump seq to odd -> write data + length -> bump seq to even (commit).
+    - Reader: read Header (Seq1); bail if Seq1 is 0/odd/already-seen; read data;
+      read Seq2. Data is consistent only if Seq1 == Seq2 (and Seq1 is even).
     """
 
     def __init__(self, is_writer: bool = False):
@@ -176,21 +184,30 @@ class AetherSharedMemory:
                 data = data[:MAX_PAYLOAD_SIZE]
                 data_len = MAX_PAYLOAD_SIZE
 
-            # Increment sequence number (atomic for single writer)
-            self.last_sequence += 1
+            # Seqlock write. Committed sequences are EVEN; the intermediate
+            # ODD value marks a write in progress. We move only the seq and
+            # length fields (a whole-header rewrite isn't atomic); MAGIC and
+            # VERSION are written once at init and never change.
+            in_progress = self.last_sequence + 1  # odd
+            committed = self.last_sequence + 2     # even
 
-            # 1. Memory Barrier Simulation: Write Data FIRST
-            # This ensures that if reader sees new sequence, data is already there.
+            # 1. Mark write in progress (odd). Readers seeing this skip the frame.
+            self._mm.seek(SEQ_OFFSET)
+            self._mm.write(struct.pack("@Q", in_progress))
+
+            # 2. Write payload, then length. Both land before the commit, so any
+            # reader that later observes the even sequence sees a matching length
+            # and intact data (x86 TSO orders the stores).
             self._mm.seek(HEADER_SIZE)
             self._mm.write(data)
+            self._mm.seek(LEN_OFFSET)
+            self._mm.write(struct.pack("@I", data_len))
 
-            # 2. Write Header (Commit)
-            # Updates Sequence number, making the new data valid
-            header = struct.pack(
-                HEADER_FORMAT, MAGIC, VERSION, self.last_sequence, data_len
-            )
-            self._mm.seek(0)
-            self._mm.write(header)
+            # 3. Commit (even) — a single atomic 64-bit store publishes the frame.
+            self._mm.seek(SEQ_OFFSET)
+            self._mm.write(struct.pack("@Q", committed))
+
+            self.last_sequence = committed
 
             return True
 
@@ -227,10 +244,9 @@ class AetherSharedMemory:
                     )
                 return None
 
-            # Check if this is new data (optimization)
-            # Only skip if uninitialized (seq1 == 0) or if we've already read this exact sequence
-            # Changed from <= to == so we read ANY new sequence number, even if daemon skipped ahead
-            if seq1 == 0 or seq1 == self.last_sequence:
+            # Skip if uninitialized (seq1 == 0), mid-write (odd = in-progress
+            # marker), or already seen (== last read sequence).
+            if seq1 == 0 or (seq1 & 1) == 1 or seq1 == self.last_sequence:
                 return None
 
             # Validate data length

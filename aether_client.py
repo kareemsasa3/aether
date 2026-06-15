@@ -48,16 +48,17 @@ class AetherClient:
         "sub_bass",  # 20-60 Hz
         "bass",  # 60-250 Hz
         "low_mid",  # 250-500 Hz
-        "mid",  # 500-2000 Hz
-        "high_mid",  # 2000-4000 Hz
-        "treble",  # 4000-8000 Hz
-        "sparkle",  # 8000-16000 Hz (NOTE: Not 'presence')
+        "mid",  # 500-1000 Hz
+        "high_mid",  # 1000-2000 Hz
+        "treble",  # 2000-4000 Hz
+        "sparkle",  # 4000-8000 Hz (NOTE: Not 'presence')
     ]
 
     def __init__(self):
         """Initialize Aether client using existing SHM protocol."""
         self.shm = AetherSharedMemory(is_writer=False)
         self._last_event = None
+        self._last_bands = None
 
     def connect(self) -> bool:
         """
@@ -73,16 +74,19 @@ class AetherClient:
         Read current frequency band energies.
 
         Returns:
-            Dictionary mapping band names to energy values (0.0-1.0),
-            or None if daemon is not running or no data available.
+            Dictionary mapping band names to energy values (0.0-1.0).
+            Returns the most recently published state, so repeated calls
+            within a single daemon frame (~43ms) return consistent values
+            rather than None. Returns None only if no event has ever been
+            read (daemon not running or no data yet).
         """
         event = self.shm.read_event()
 
         if event and "bands" in event:
             self._last_event = event
-            return event["bands"]
+            self._last_bands = event["bands"]
 
-        return None
+        return self._last_bands
 
     def get_band(self, band_name: str) -> float:
         """
