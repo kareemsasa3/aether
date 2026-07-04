@@ -41,6 +41,7 @@ jobs:
           test_config_model.py
           test_render.py
           test_engine.py
+          test_styles.py
 
       - name: Seqlock protocol tests (direct)
         run: python test_aether_shm_seqlock.py
@@ -57,5 +58,8 @@ jobs:
       - name: Engine state tests (direct)
         run: python test_engine.py
 
+      - name: Style contract tests (direct)
+        run: python test_styles.py
+
       - name: Test suite (pytest)
-        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py test_render.py test_engine.py -q
+        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py test_render.py test_engine.py test_styles.py -q
