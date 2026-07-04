@@ -12,15 +12,22 @@ behavior both call sites rely on:
   - resolve_style_name(): the CLI's selection semantics — 1-based numbers,
     slugs, and case-insensitive display names resolve; anything else -> None
   - load_default_style(): returns a usable fallback style
+  - aether.load_style() at the interactive prompt: blank input selects the
+    default style (neon_wave); invalid nonblank input still exits with 1
 
-All headless: styles import fine without a curses session, and a tmp
-styles_dir exercises the failure paths without touching the real catalog.
+All headless: styles import fine without a curses session, a tmp styles_dir
+exercises the failure paths without touching the real catalog, and the
+prompt tests stub input()/time.sleep and capture stdout.
 
 Run directly (`python3 test_style_catalog.py`) or via pytest.
 """
+import builtins
+import io
 import os
 import sys
 import tempfile
+import time
+from contextlib import redirect_stdout
 from pathlib import Path
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -145,6 +152,44 @@ def test_load_default_style():
     assert module.STYLE_NAME in ("Neon Wave", "Classic Wave")
 
 
+def _load_style_at_prompt(user_input):
+    """Drive aether.load_style(None) with a canned prompt answer, muting the
+    menu output and the cosmetic post-selection sleep."""
+    import aether
+
+    orig_input = builtins.input
+    orig_sleep = time.sleep
+    builtins.input = lambda prompt="": user_input
+    time.sleep = lambda seconds: None
+    try:
+        with redirect_stdout(io.StringIO()) as out:
+            module = aether.load_style(None)
+        return module, out.getvalue()
+    finally:
+        builtins.input = orig_input
+        time.sleep = orig_sleep
+
+
+def test_blank_prompt_input_selects_default_style():
+    # Just pressing Enter (or entering whitespace) must not exit; it selects
+    # the default style, neon_wave — first of style_catalog.DEFAULT_STYLES.
+    for blank in ("", "   "):
+        module, output = _load_style_at_prompt(blank)
+        assert module.STYLE_NAME == "Neon Wave", f"input {blank!r}"
+        assert "Loading style: Neon Wave" in output
+
+
+def test_invalid_prompt_input_still_exits():
+    # Nonblank-but-unknown input keeps the documented failure path:
+    # report the style and the available list, then exit 1.
+    try:
+        _load_style_at_prompt("no_such_style")
+    except SystemExit as e:
+        assert e.code == 1
+    else:
+        raise AssertionError("expected SystemExit for unknown style")
+
+
 _TESTS = [
     test_list_style_names_sorted_slugs,
     test_load_style_module_valid,
@@ -158,6 +203,8 @@ _TESTS = [
     test_resolve_every_display_name,
     test_resolve_unknown_name_is_none,
     test_load_default_style,
+    test_blank_prompt_input_selects_default_style,
+    test_invalid_prompt_input_still_exits,
 ]
 
 

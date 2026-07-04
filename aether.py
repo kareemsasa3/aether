@@ -866,6 +866,10 @@ def load_style(style_name=None):
 
         style_name = input("\nSelect style (number or name): ")
 
+        # Just pressing Enter selects the default style rather than erroring.
+        if not style_name.strip():
+            style_name = style_catalog.DEFAULT_STYLES[0]
+
     # Resolve number / slug / case-insensitive display name to a slug.
     resolved = style_catalog.resolve_style_name(style_name, available_styles)
     if resolved is None:
