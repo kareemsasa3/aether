@@ -17,6 +17,10 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     if age >= 100:
         return None
 
+    # Use a seeded random for stable character selection (prevents flicker).
+    # The sample_id is constant for a specific audio sample as it radiates.
+    rng = random.Random(sample_id)
+
     intensity = abs(amp)
 
     # Droplet characters
@@ -32,13 +36,13 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
             char = drops[1]
     elif age < 8:
         if amp > 0:
-            char = random.choice(falling[:3])  # Falling
+            char = rng.choice(falling[:3])  # Falling
         else:
-            char = random.choice(drops[1:4])
+            char = rng.choice(drops[1:4])
     elif age < 15:
-        char = random.choice(splash[:4])  # Splash spreading
+        char = rng.choice(splash[:4])  # Splash spreading
     else:
-        char = random.choice(splash[4:])  # Dissipating
+        char = rng.choice(splash[4:])  # Dissipating
 
     # Blue/cyan for water feel
     if age < 2:
@@ -52,9 +56,9 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     else:
         attr = colors[2] | curses.A_DIM
 
-    # Occasional ripple effect
-    if random.random() < 0.03:
-        char = random.choice(["~", "≈", "∿"])
+    # Occasional ripple effect (seeded: some samples ripple, stably)
+    if rng.random() < 0.03:
+        char = rng.choice(["~", "≈", "∿"])
         attr = colors[5]
 
     return (char, attr)

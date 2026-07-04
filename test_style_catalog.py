@@ -10,7 +10,7 @@ behavior both call sites rely on:
   - load_catalog(): one entry per style with name/display/desc/module, and
     the 16 expected display names
   - resolve_style_name(): the CLI's selection semantics — 1-based numbers,
-    out-of-range numbers -> None, anything else passed through as a slug
+    slugs, and case-insensitive display names resolve; anything else -> None
   - load_default_style(): returns a usable fallback style
 
 All headless: styles import fine without a curses session, and a tmp
@@ -99,12 +99,44 @@ def test_resolve_number_out_of_range_is_none():
     assert style_catalog.resolve_style_name("99", available) is None
 
 
-def test_resolve_non_numeric_passes_through():
-    # Non-numeric input is treated as a slug; existence is the caller's
-    # problem (the CLI reports "not found" and exits, as before).
+def test_resolve_by_exact_slug():
     available = style_catalog.list_style_names()
     assert style_catalog.resolve_style_name("matrix_rain", available) == "matrix_rain"
-    assert style_catalog.resolve_style_name("no_such", available) == "no_such"
+    assert style_catalog.resolve_style_name("neon_wave", available) == "neon_wave"
+
+
+def test_resolve_by_case_insensitive_name():
+    available = style_catalog.list_style_names()
+    assert style_catalog.resolve_style_name("Matrix Rain", available) == "matrix_rain"
+    assert style_catalog.resolve_style_name("matrix rain", available) == "matrix_rain"
+    assert style_catalog.resolve_style_name("MATRIX_RAIN", available) == "matrix_rain"
+    assert style_catalog.resolve_style_name(" Neon Wave ", available) == "neon_wave"
+    assert style_catalog.resolve_style_name("fire", available) == "fire"
+    assert style_catalog.resolve_style_name("FIRE", available) == "fire"
+
+
+def test_resolve_every_display_name():
+    # Every display name in the catalog must resolve to its own slug, so the
+    # names shown in the CLI menu are always valid selections.
+    for entry in style_catalog.load_catalog():
+        for variant in (
+            entry["display"],
+            entry["display"].lower(),
+            entry["display"].upper(),
+        ):
+            resolved = style_catalog.resolve_style_name(
+                variant, style_catalog.list_style_names()
+            )
+            assert resolved == entry["name"], (
+                f"{variant!r} resolved to {resolved!r}, expected {entry['name']!r}"
+            )
+
+
+def test_resolve_unknown_name_is_none():
+    # The CLI reports "not found" and exits gracefully on None, as before.
+    available = style_catalog.list_style_names()
+    assert style_catalog.resolve_style_name("no_such", available) is None
+    assert style_catalog.resolve_style_name("", available) is None
 
 
 def test_load_default_style():
@@ -121,7 +153,10 @@ _TESTS = [
     test_load_catalog_skips_broken_styles,
     test_resolve_by_number,
     test_resolve_number_out_of_range_is_none,
-    test_resolve_non_numeric_passes_through,
+    test_resolve_by_exact_slug,
+    test_resolve_by_case_insensitive_name,
+    test_resolve_every_display_name,
+    test_resolve_unknown_name_is_none,
     test_load_default_style,
 ]
 

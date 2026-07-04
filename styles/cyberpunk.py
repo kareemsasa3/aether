@@ -17,6 +17,10 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     if age >= 65:  # Extended from 22 for longer persistence
         return None
 
+    # Use a seeded random for stable character selection (prevents flicker).
+    # The sample_id is constant for a specific audio sample as it radiates.
+    rng = random.Random(sample_id)
+
     # Cyberpunk symbol groups
     tech_symbols = ["¥", "€", "₿", "£", "$"]
     code_symbols = ["@", "#", "%", "&", "*", "^"]
@@ -27,13 +31,13 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
 
     # Symbol selection creates the cyberpunk texture
     if age < 9 and intensity > 0.5:
-        char = random.choice(tech_symbols + glyphs)
+        char = rng.choice(tech_symbols + glyphs)
     elif age < 24:
-        char = random.choice(code_symbols + glyphs)
+        char = rng.choice(code_symbols + glyphs)
     elif age < 45:
-        char = random.choice(code_symbols + lines)
+        char = rng.choice(code_symbols + lines)
     else:
-        char = random.choice(lines + ["·", ":", "."])
+        char = rng.choice(lines + ["·", ":", "."])
 
     if age < 9:
         # Hot pink for fresh signals
@@ -49,8 +53,8 @@ def render_waveform(i, amp, age, max_width, colors, sample_id=0):
     else:
         attr = colors[2] | curses.A_DIM
 
-    # Random neon flicker
-    if random.random() < 0.08:
-        attr = colors[random.choice([3, 4, 5])] | curses.A_BOLD
+    # Random neon flicker (seeded: some samples glow, stably, as they radiate)
+    if rng.random() < 0.08:
+        attr = colors[rng.choice([3, 4, 5])] | curses.A_BOLD
 
     return (char, attr)

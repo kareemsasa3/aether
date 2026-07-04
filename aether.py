@@ -864,18 +864,20 @@ def load_style(style_name=None):
             print(f"  {idx:2d}. {entry['display']:20s} - {desc}")
         print("=" * 70)
 
-        choice = input("\nSelect style (number or name): ")
-        style_name = style_catalog.resolve_style_name(choice, available_styles)
+        style_name = input("\nSelect style (number or name): ")
+
+    # Resolve number / slug / case-insensitive display name to a slug.
+    resolved = style_catalog.resolve_style_name(style_name, available_styles)
+    if resolved is None:
+        print(f"Style '{style_name.strip()}' not found!")
+        print(f"Available styles: {', '.join(available_styles)}")
+        sys.exit(1)
 
     # Load the style module
     try:
-        style_module = style_catalog.load_style_module(style_name)
-    except FileNotFoundError:
-        print(f"Style '{style_name}' not found!")
-        print(f"Available styles: {', '.join(available_styles)}")
-        sys.exit(1)
+        style_module = style_catalog.load_style_module(resolved)
     except Exception as e:
-        print(f"Error loading style '{style_name}': {e}")
+        print(f"Error loading style '{resolved}': {e}")
         return load_default_style()
 
     print(f"\n🎨 Loading style: {getattr(style_module, 'STYLE_NAME', style_name)}")

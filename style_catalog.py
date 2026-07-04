@@ -63,19 +63,31 @@ def load_catalog(styles_dir=STYLES_DIR):
     return catalog
 
 
-def resolve_style_name(choice, available):
-    """Resolve a CLI selection string against the available style slugs.
+def _normalize(name):
+    """Fold a style reference to slug form: lowercase, separators -> _."""
+    return name.strip().lower().replace(" ", "_").replace("-", "_")
 
-    Mirrors the original interactive-prompt semantics exactly:
-      - a number selects 1-based from `available`; out of range -> None
-      - anything else is returned as-is and treated as a slug by the caller
-        (which reports an error if no such style exists)
+
+def resolve_style_name(choice, available):
+    """Resolve a selection string against the available style slugs.
+
+    Accepts a 1-based number or a name. Names are matched case-insensitively
+    with spaces/hyphens folding to underscores, so "matrix_rain",
+    "Matrix Rain", and "MATRIX RAIN" all resolve (display names follow the
+    slug-with-capitals convention throughout styles/; test_style_catalog
+    verifies every catalog display name resolves this way).
+
+    Returns the matching slug, or None if nothing matches.
     """
     choice = choice.strip()
     try:
         idx = int(choice) - 1
     except ValueError:
-        return choice
+        normalized = _normalize(choice)
+        for name in available:
+            if _normalize(name) == normalized:
+                return name
+        return None
     if 0 <= idx < len(available):
         return available[idx]
     return None

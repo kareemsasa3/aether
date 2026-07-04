@@ -12,8 +12,8 @@ catalog/loop overhaul:
   - render_waveform returns None or (str, int) across a sweep of inputs,
     including tiny max_width values and extreme amp/age
   - render_waveform is deterministic for fixed inputs (styles with randomness
-    seed a local random.Random(sample_id); cyberpunk and rain_drops still use
-    the unseeded module RNG and are exempted here until they are migrated)
+    seed a local random.Random(sample_id) so a sample keeps its glyph as it
+    radiates instead of flickering every frame)
 
 All headless: no curses session is needed because styles only combine the
 integer attrs passed in via `colors` with curses.A_* constants.
@@ -50,11 +50,6 @@ EXPECTED_STYLE_NAMES = {
     "Rain Drops",
     "Starfield",
 }
-
-# Styles whose render_waveform still calls the unseeded module-level RNG
-# instead of random.Random(sample_id). Exempt from the determinism check
-# until they are migrated.
-NONDETERMINISTIC_STYLES = {"Cyberpunk", "Rain Drops"}
 
 # Distinct sentinel attrs so a style mixing up color indices would show up.
 COLORS = {n: n * 1000 for n in range(1, 11)}
@@ -119,8 +114,6 @@ def test_render_waveform_output_shape():
 
 def test_render_waveform_deterministic_for_fixed_inputs():
     for stem, module in _load_all_styles().items():
-        if module.STYLE_NAME in NONDETERMINISTIC_STYLES:
-            continue
         for i, amp, age, max_width in _sweep_inputs():
             for sample_id in (0, 7, -3):
                 first = module.render_waveform(
