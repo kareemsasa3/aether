@@ -44,7 +44,7 @@ Unlike traditional visualizers where processing and rendering are coupled, Aethe
 - **Publisher**: The Daemon writes to `/dev/shm/aether_audio_event` using a **seqlock** (a sequence-versioned, lock-free protocol).
 - **Contract**: A lock-free shared memory region (~20-100μs latency). Consumers detach, lag, or crash without ever affecting the analysis pipeline.
 - **Reference Consumers**:
-  - **TUI**: A curses-based visualizer with 15+ styles.
+  - **TUI**: A curses-based visualizer with 17 styles.
   - **RGB**: A physical sync engine for 300+ LEDs via OpenRGB.
 
 ## 🚀 Deployment
@@ -81,9 +81,19 @@ aether-query --monitor   # Watch the raw data stream
 
 ## ✨ Reference Visualizer Styles
 
-The provided TUI (`aether.py`) includes 15+ "Reference Styles" demonstrating how to transform the shared memory data:
+The provided TUI (`aether.py`) includes 17 "Reference Styles" demonstrating how to transform the shared memory data. Styles come in two tiers:
 
-- **Aurora** | **Matrix Rain** | **Cyberpunk** | **Glitch Art** | **Fire** | **Starfield**
+- **Frame styles** own the whole waveform region every frame (`render_frame(ctx, canvas)`) and compose full scenes — persistent motion, beat pulses, layered backgrounds, and ambient "resting" visuals during silence:
+  - **Neon Wave** (★ default/showcase) — mirrored gradient wave, beat flashes, falling peak trails
+  - **Spectra** — full-width mirrored spectrum bars with falling peak caps
+  - **Matrix Rain** — cascading digital rain; energy spawns drops, bass speeds them
+  - **Aurora** — full-height light curtains with drifting colors
+  - **Starfield** — parallax stars that jump to warp speed on the bass
+  - **Rain Drops** — rainfall onto a rippling water surface with splashes
+  - **Cyberpunk** — neon signal over a city skyline with glitch scanlines
+  - **Classic Wave** — CRT oscilloscope with a continuous trace and phosphor decay
+  - **Minimalist** — a single high-resolution braille curve
+- **Cell styles** (Fire, Glitch Art, Heartbeat, Neon Pulse, Pixel Art, Geometric, Data Stream, Dense Fade) plot one glyph per waveform sample via `render_waveform(...)`.
 - _Toggle with `S` during playback._
 
 ## 📊 Performance by Design

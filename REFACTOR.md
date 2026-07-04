@@ -107,6 +107,32 @@ known-good state before this phase):
   glyphs as they radiate instead of re-rolling every frame. Determinism is
   now tested for all 16 styles.
 
+## Phase 6: the visual overhaul (2026-07-04)
+
+Unlike phases 1–5, this phase was a product change, not a
+behavior-preserving move: the goal was visibly better output.
+
+- The style seam gained a second, **additive** entry point:
+  `render_frame(ctx, canvas)`. A style that defines it receives the whole
+  waveform region as a `render.Canvas` each frame plus a
+  `render.FrameContext` (frame counter, band energies, 12 spectrum bins,
+  bass-onset `beat` pulse, `silence_frames`, per-column wave samples, all
+  10 color pairs). Styles without it keep the legacy per-sample
+  `render_waveform` path unchanged — that signature is still frozen, and
+  every style keeps it as a fallback.
+- `engine.VisualizerState` gained the beat/quiet envelope
+  (`beat_pulse`, `silence_frames`) driven inside `add_scroll_sample`.
+- Frame styles animate off `ctx.frame` and seeded randomness only (no
+  wall-clock, no unseeded random), so `tick()` determinism still holds;
+  `test_frame_styles.py` pins the new contract (signal scene, ambient
+  scene during silence, determinism across fresh loads, degenerate sizes).
+- Nine styles are frame styles now: Neon Wave (default showcase), Spectra
+  (new), Matrix Rain, Aurora, Starfield, Rain Drops, Cyberpunk, Classic
+  Wave, Minimalist. The other eight remain cell styles.
+- `render.init_colors` stopped gating the 256-color palette on
+  `curses.can_change_color()` (most terminals report False), which had
+  been silently forcing the 8-color fallback everywhere.
+
 ## The Phase 4 split decision
 
 Phase 4 (originally "visualizer state / ingestion / decay") was split once the
@@ -148,8 +174,10 @@ None of these are required; they are noted for a future handoff.
 
 ## Guardrails (still in force for any future phase)
 
-- **Do not change the style plugin API** — `render_waveform`'s signature and the
-  `STYLE_NAME` / `STYLE_DESCRIPTION` attributes are the one clean seam.
+- **Do not change the style plugin API** — `render_waveform`'s signature, the
+  optional `render_frame(ctx, canvas)` entry point, and the `STYLE_NAME` /
+  `STYLE_DESCRIPTION` attributes are the one clean seam. Extensions must be
+  additive, as `render_frame` was.
 - **Do not split `draw_*` methods ahead of the state they read.**
 - **Keep each phase behavior-preserving** — moves, not redesigns; one phase per
   commit.
