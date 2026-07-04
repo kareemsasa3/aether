@@ -938,7 +938,8 @@ def load_style(style_name=None):
         print("=" * 70)
         for idx, entry in enumerate(style_catalog.load_catalog(), 1):
             desc = entry["desc"] or "No description"
-            print(f"  {idx:2d}. {entry['display']:20s} - {desc}")
+            star = " ★" if entry["name"] == style_catalog.DEFAULT_STYLES[0] else ""
+            print(f"  {idx:2d}. {entry['display']:20s} - {desc}{star}")
         print("=" * 70)
 
         style_name = input("\nSelect style (number or name): ")

@@ -7,7 +7,7 @@ render_waveform(i, amp, age, max_width, colors, sample_id) returning either
 None or a (char, attr) tuple. These tests pin that contract before the style
 catalog/loop overhaul:
 
-  - the 16 expected styles are discoverable and loadable
+  - the 17 expected styles are discoverable and loadable
   - every style declares STYLE_NAME / STYLE_DESCRIPTION and render_waveform
   - render_waveform returns None or (str, int) across a sweep of inputs,
     including tiny max_width values and extreme amp/age
@@ -34,6 +34,7 @@ STYLES_DIR = Path(_HERE) / "styles"
 # The full expected catalog, by display name (STYLE_NAME).
 EXPECTED_STYLE_NAMES = {
     "Aurora",
+    "Spectra",
     "Classic Wave",
     "Cyberpunk",
     "Data Stream",

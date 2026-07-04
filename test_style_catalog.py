@@ -8,7 +8,7 @@ behavior both call sites rely on:
   - list_style_names(): sorted slugs of every style file
   - load_style_module(): loads a real plugin; FileNotFoundError when missing
   - load_catalog(): one entry per style with name/display/desc/module, and
-    the 16 expected display names
+    the 17 expected display names
   - resolve_style_name(): the CLI's selection semantics — 1-based numbers,
     slugs, and case-insensitive display names resolve; anything else -> None
   - load_default_style(): returns a usable fallback style
@@ -41,7 +41,7 @@ from test_styles import EXPECTED_STYLE_NAMES  # noqa: E402
 def test_list_style_names_sorted_slugs():
     names = style_catalog.list_style_names()
     assert names == sorted(names)
-    assert len(names) == 16
+    assert len(names) == 17
     assert "aurora" in names
     assert "neon_wave" in names
     assert "__init__" not in names
@@ -91,7 +91,7 @@ def test_resolve_by_number():
     available = style_catalog.list_style_names()
     # 1-based indexing over the sorted slugs.
     assert style_catalog.resolve_style_name("1", available) == available[0]
-    assert style_catalog.resolve_style_name("16", available) == available[15]
+    assert style_catalog.resolve_style_name("17", available) == available[16]
     idx = available.index("matrix_rain")
     assert style_catalog.resolve_style_name(str(idx + 1), available) == "matrix_rain"
     # Whitespace around the number is tolerated (input() strip behavior).
@@ -101,7 +101,7 @@ def test_resolve_by_number():
 def test_resolve_number_out_of_range_is_none():
     available = style_catalog.list_style_names()
     assert style_catalog.resolve_style_name("0", available) is None
-    assert style_catalog.resolve_style_name("17", available) is None
+    assert style_catalog.resolve_style_name("18", available) is None
     assert style_catalog.resolve_style_name("-1", available) is None
     assert style_catalog.resolve_style_name("99", available) is None
 
