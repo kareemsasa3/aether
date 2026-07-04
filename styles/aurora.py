@@ -1,20 +1,77 @@
-"""Aurora - Northern lights inspired flowing curtains"""
+"""Aurora - full-height northern-lights curtains that dance to the music"""
 
 import curses
-import random
 import math
+import random
 
 STYLE_NAME = "Aurora"
-STYLE_DESCRIPTION = "Northern lights with flowing color curtains"
+STYLE_DESCRIPTION = "Flowing full-height light curtains with drifting colors"
+
+
+def _curtain_height(x, frame, energy, h):
+    """Layered sines give each column a slowly drifting curtain length."""
+    n = (
+        0.5
+        + 0.25 * math.sin(x * 0.09 + frame * 0.03)
+        + 0.25 * math.sin(x * 0.023 - frame * 0.011)
+    )
+    return int(n * energy * (h - 1))
+
+
+def render_frame(ctx, canvas):
+    """Curtains hang from the sky; bass makes them billow, treble sparkles.
+
+    Stateless by design: everything is a function of (x, frame) plus the
+    band levels, so the drift stays smooth and deterministic.
+    """
+    h, w = ctx.height, ctx.width
+    colors = ctx.colors
+
+    # Energy floor keeps a gentle aurora drifting during silence.
+    energy = min(1.0, 0.35 + 0.45 * ctx.mid + 0.35 * ctx.bass + 0.3 * ctx.beat)
+    surge = ctx.beat > 0.7
+    rng = random.Random(ctx.frame // 3 * 51349 + w)
+
+    for x in range(w):
+        hgt = _curtain_height(x, ctx.frame, energy, h)
+        if hgt <= 0:
+            continue
+
+        # Color bands drift sideways over time.
+        hue = math.sin(x * 0.05 + ctx.frame * 0.02)
+        if hue > 0.3:
+            base = colors[1]  # Green
+        elif hue > -0.4:
+            base = colors[3]  # Cyan
+        else:
+            base = colors[4]  # Magenta
+
+        for y in range(hgt + 1):
+            depth = y / max(1, hgt)
+            if depth < 0.55:
+                char, attr = "░", base
+            elif depth < 0.85:
+                char, attr = "▒", base
+            else:
+                # The luminous lower edge of the curtain.
+                char = "▓"
+                attr = base | curses.A_BOLD
+            if surge:
+                attr |= curses.A_BOLD
+            canvas.set(y, x, char, attr)
+
+        # Treble scatters sparkles just below the curtain's glowing hem.
+        if ctx.treble > 0.35 and rng.random() < 0.04 + 0.08 * ctx.treble:
+            canvas.set(hgt + 1 + rng.randrange(2), x, "✧", colors[6] | curses.A_BOLD)
+
+    # Faint ground reflection along the bottom row.
+    for x in range(0, w, 2):
+        if _curtain_height(x, ctx.frame, energy, h) > h // 2:
+            canvas.set(h - 1, x, "·", colors[2])
 
 
 def render_waveform(i, amp, age, max_width, colors, sample_id=0):
-    """
-    Render waveform with aurora borealis effect.
-
-    Creates flowing, curtain-like patterns with color
-    shifts reminiscent of the northern lights.
-    """
+    """Legacy single-cell fallback (kept for the stable style contract)."""
     if age >= 80:
         return None
 
