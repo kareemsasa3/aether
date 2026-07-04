@@ -24,9 +24,16 @@ class UltimateOscilloscope:
     CONFIG_SCHEMA = VizConfig.CONFIG_SCHEMA
     PRESETS = VizConfig.PRESETS
 
-    def __init__(self, stdscr, style_module):
+    def __init__(self, stdscr, style_module, shm=None):
+        """Build the visualizer against `stdscr`.
+
+        Global terminal setup (cursor visibility, color pairs) happens in
+        main() before construction, so `stdscr` only needs the window API
+        (getmaxyx/addstr/clear/refresh/nodelay/getch) — a fake screen works
+        for headless tests. `shm` is injectable for the same reason; None
+        means attach the real shared-memory reader.
+        """
         self.stdscr = stdscr
-        curses.curs_set(0)
         self.stdscr.nodelay(True)
 
         # Configurable settings now live in the config model.
@@ -34,9 +41,6 @@ class UltimateOscilloscope:
 
         # Config menu state
         self.config_keys = self.config_model.keys
-
-        # Initialize the curses color palette (256-color with 8-color fallback).
-        render.init_colors()
 
         # State Initialization
         self.design_mode = "OSCILLOSCOPE"  # Options: "OSCILLOSCOPE", "SPECTRUM"
@@ -49,8 +53,8 @@ class UltimateOscilloscope:
         # Event tracking
         self.last_event_time = 0
 
-        # Initialize Shared Memory Reader
-        self.shm = AetherSharedMemory(is_writer=False)
+        # Initialize Shared Memory Reader (unless a test injected one)
+        self.shm = shm if shm is not None else AetherSharedMemory(is_writer=False)
 
         # Style module for waveform rendering
         self.style = style_module
@@ -729,8 +733,64 @@ class UltimateOscilloscope:
         """Show the configuration overlay (logic in ui/overlays.py)."""
         overlays.run_config_menu(self)
 
+    def tick(self):
+        """Advance and draw one frame of dynamic content.
+
+        Everything time- and terminal-loop-independent about a frame lives
+        here: ingest pending events, advance the scroll/smoothing state, clear
+        the dynamic regions, and redraw them. No input handling, no timing,
+        no refresh — run() owns those — so a single frame is reproducible
+        headlessly for a fixed state.
+        """
+        # Check for events (updates target_amp/target_freq)
+        self.check_for_events()
+
+        # Add one sample per frame for smooth scrolling
+        self.add_scroll_sample()
+
+        # Clear dynamic areas only
+        self.clear_waveform_area()
+        self.clear_spectrum_area()
+
+        # Redraw ONLY dynamic content
+        # Redraw frame (dispatches to current design)
+        self.draw_frame()
+
+        self.draw_status()
+        self.draw_debug_stats()
+
+    def handle_key(self, key):
+        """Handle one keypress; returns False when the loop should quit."""
+        if key == curses.KEY_RESIZE:
+            # Optimization: Check if size actually changed to avoid flicker
+            h, w = self.stdscr.getmaxyx()
+            if h != self.height or w != self.width:
+                self.recalculate_layout()
+                self.stdscr.clear()
+                self.draw_static_elements()
+                self.draw_waveform_grid()
+        elif key == ord("q") or key == ord("Q"):
+            return False
+        elif key == ord("s") or key == ord("S"):
+            self.switch_style()
+        elif key == ord("c") or key == ord("C"):
+            self.show_config()
+        elif key == ord("d") or key == ord("D"):
+            # Toggle Design Mode
+            self.design_mode = (
+                "SPECTRUM"
+                if self.design_mode == "OSCILLOSCOPE"
+                else "OSCILLOSCOPE"
+            )
+            self.recalculate_layout()
+            self.stdscr.clear()
+            self.draw_static_elements()
+            if self.design_mode == "OSCILLOSCOPE":
+                self.draw_waveform_grid()
+        return True
+
     def run(self):
-        """Main loop"""
+        """Main loop: tick, refresh, FPS bookkeeping, input, decay, sleep."""
         self.stdscr.clear()
         self.draw_static_elements()
         self.draw_waveform_grid()
@@ -742,22 +802,7 @@ class UltimateOscilloscope:
             while True:
                 start_time = time.perf_counter()
 
-                # Check for events (updates target_amp/target_freq)
-                self.check_for_events()
-
-                # Add one sample per frame for smooth scrolling
-                self.add_scroll_sample()
-
-                # Clear dynamic areas only
-                self.clear_waveform_area()
-                self.clear_spectrum_area()
-
-                # Redraw ONLY dynamic content
-                # Redraw frame (dispatches to current design)
-                self.draw_frame()
-
-                self.draw_status()
-                self.draw_debug_stats()
+                self.tick()
 
                 self.stdscr.refresh()
 
@@ -772,32 +817,8 @@ class UltimateOscilloscope:
                 # Check for quit or style switch
                 try:
                     key = self.stdscr.getch()
-                    if key == curses.KEY_RESIZE:
-                        # Optimization: Check if size actually changed to avoid flicker
-                        h, w = self.stdscr.getmaxyx()
-                        if h != self.height or w != self.width:
-                            self.recalculate_layout()
-                            self.stdscr.clear()
-                            self.draw_static_elements()
-                            self.draw_waveform_grid()
-                    elif key == ord("q") or key == ord("Q"):
+                    if not self.handle_key(key):
                         break
-                    elif key == ord("s") or key == ord("S"):
-                        self.switch_style()
-                    elif key == ord("c") or key == ord("C"):
-                        self.show_config()
-                    elif key == ord("d") or key == ord("D"):
-                        # Toggle Design Mode
-                        self.design_mode = (
-                            "SPECTRUM"
-                            if self.design_mode == "OSCILLOSCOPE"
-                            else "OSCILLOSCOPE"
-                        )
-                        self.recalculate_layout()
-                        self.stdscr.clear()
-                        self.draw_static_elements()
-                        if self.design_mode == "OSCILLOSCOPE":
-                            self.draw_waveform_grid()
                 except Exception:
                     pass
 
@@ -869,6 +890,10 @@ _style_module = None
 
 def main(stdscr):
     global _style_module
+    # Global terminal setup lives here, not in the constructor, so the
+    # oscilloscope can be built against a fake screen in headless tests.
+    curses.curs_set(0)
+    render.init_colors()
     scope = UltimateOscilloscope(stdscr, _style_module)
     scope.run()
 
