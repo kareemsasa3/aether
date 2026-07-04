@@ -1,14 +1,16 @@
 # Refactor: Decomposing the `aether.py` TUI Monolith
 
-> Status: **Phases 1–4a complete.** The original 1671-line `aether.py` monolith
-> has been carved into `ui/overlays.py`, `config_model.py`, `render.py`, and
-> `engine.py`, each behind a tested seam. `aether.py` is now ~929 lines.
-> Remaining work (Phase 4b/4c and small cleanups) is **optional** and listed at
-> the end — none of it is required for the codebase to be in a good state.
+> Status: **Phases 1–5 complete.** The original 1671-line `aether.py` monolith
+> has been carved into `ui/overlays.py`, `config_model.py`, `render.py`,
+> `engine.py`, and `style_catalog.py`, each behind a tested seam. `aether.py`
+> is now ~900 lines and its frame loop is headlessly testable. Remaining work
+> (Phase 4b/4c and small cleanups) is **optional** and listed at the end —
+> none of it is required for the codebase to be in a good state.
 >
 > Each phase was landed as its own behavior-preserving commit, with automated
-> tests where the logic is headless and a manual TUI smoke (the curses UI has no
-> automated coverage). The suite is currently **39 tests**.
+> tests where the logic is headless and a manual TUI smoke (the frame path and
+> input dispatch now have automated coverage too; only the modal overlays
+> remain manual-smoke-only). The suite is currently **71 tests**.
 
 ## Starting point (for context)
 
@@ -74,6 +76,36 @@ plugin API and never splitting draw methods ahead of the state they read.
   spectrum, RGB clamp math, both dispatch paths, smoothing/sample-count, decay).
 - Manual TUI smoke passed for launch/render, oscilloscope mode, spectrum mode,
   RGB preview, config overlay, style overlay, and resize.
+
+### Phase 5 — Style catalog + headless frame loop ✅
+
+Landed as four commits (tag `pre-visualizer-overhaul-20260704` marks the
+known-good state before this phase):
+
+- `1529b19 Add style plugin contract characterization tests` —
+  `test_styles.py` pins the styles/ seam first: the 16 expected styles,
+  metadata/render contract, output shape across an input sweep, and
+  determinism for fixed inputs.
+- `dd1f365 Extract Aether style catalog` — style discovery/loading was
+  duplicated between `aether.py` (CLI) and `ui/overlays.py` (picker); both now
+  use `style_catalog.py` (pure discovery/loading — no printing, `input()`, or
+  `sys.exit`, so selection semantics are unit-testable). CLI output preserved.
+- `332b387 Make the visualizer frame loop headlessly testable` — three seams,
+  no behavior change: global terminal setup (curs_set, color init) moved from
+  the constructor to `main()`; the SHM reader became injectable (`shm=`); and
+  `run()` split into `tick()` (one frame of dynamic content) + `handle_key()`
+  (input dispatch), with `run()` keeping refresh/FPS/decay/pacing.
+  `test_visualizer_frame.py` drives the draw pipeline against a strict fake
+  screen: sizes down to 1x1, both design modes, deterministic tick output,
+  and quit/mode/resize key semantics.
+- `b70e733 Improve style selection and stabilize flickery styles` — the one
+  deliberate behavior change of the phase: style names resolve
+  case-insensitively (spaces/hyphens fold to underscores) from both the
+  prompt and the CLI argument, which also accepts a 1-based number; and
+  Cyberpunk + Rain Drops migrated to the seeded `random.Random(sample_id)`
+  mechanism the other randomized styles already used, so samples keep their
+  glyphs as they radiate instead of re-rolling every frame. Determinism is
+  now tested for all 16 styles.
 
 ## The Phase 4 split decision
 
