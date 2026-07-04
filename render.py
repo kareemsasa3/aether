@@ -24,8 +24,11 @@ def init_colors():
     curses.use_default_colors()
 
     # Enhanced color palette
-    # Using 256-color mode if available for richer colors
-    if curses.can_change_color() and curses.COLORS >= 256:
+    # Using 256-color mode if available for richer colors. This must NOT be
+    # gated on can_change_color(): most 256-color terminals report False for
+    # it, but init_pair with palette indices >= 16 works regardless — the old
+    # gate silently dropped every terminal to the dull 8-color fallback.
+    if curses.COLORS >= 256:
         # Custom colors for a more vibrant look
         curses.init_pair(1, 46, -1)  # Bright green (neon)
         curses.init_pair(2, 22, -1)  # Dim green (forest)
@@ -63,6 +66,93 @@ def safe_addstr(stdscr, height, width, y, x, text, attr=0):
             stdscr.addstr(y, x, text, attr)
     except curses.error:
         pass
+
+
+class Canvas:
+    """A 2D cell buffer a frame style paints into before it is blitted.
+
+    Cells are (char, attr) tuples and default to a plain space, so a canvas
+    both draws this frame and erases the last one when blitted over the
+    waveform region. set() silently clips out-of-bounds writes, mirroring
+    safe_addstr, so styles never need their own bounds checks.
+    """
+
+    def __init__(self, height, width):
+        self.height = max(0, height)
+        self.width = max(0, width)
+        self.cells = [[(" ", 0)] * self.width for _ in range(self.height)]
+
+    def set(self, y, x, char, attr=0):
+        if 0 <= y < self.height and 0 <= x < self.width and char:
+            self.cells[y][x] = (char[0], attr)
+
+    def get(self, y, x):
+        if 0 <= y < self.height and 0 <= x < self.width:
+            return self.cells[y][x]
+        return (" ", 0)
+
+    def iter_runs(self):
+        """Yield (y, x, text, attr) for runs of consecutive same-attr cells.
+
+        One addstr per run instead of per cell keeps the full-region repaint
+        cheap at target FPS.
+        """
+        for y, row in enumerate(self.cells):
+            x = 0
+            while x < self.width:
+                attr = row[x][1]
+                start = x
+                chars = []
+                while x < self.width and row[x][1] == attr:
+                    chars.append(row[x][0])
+                    x += 1
+                yield y, start, "".join(chars), attr
+
+
+class FrameContext:
+    """Read-only inputs for a style's render_frame(ctx, canvas) call.
+
+    Everything a full-frame style needs to compose a scene: canvas geometry,
+    a frame counter (styles animate off this — never wall-clock time — so a
+    frame is reproducible for a fixed state), band energies, the beat pulse,
+    per-column wave samples as (amplitude, age) with index 0 at the left
+    edge and fresh samples near the center, and the full 10-color table.
+    """
+
+    def __init__(
+        self,
+        *,
+        frame,
+        width,
+        height,
+        amp,
+        bass,
+        mid,
+        treble,
+        spectrum,
+        beat,
+        silence_frames,
+        columns,
+        colors,
+    ):
+        self.frame = frame
+        self.width = width
+        self.height = height
+        self.amp = amp
+        self.bass = bass
+        self.mid = mid
+        self.treble = treble
+        self.spectrum = spectrum
+        self.beat = beat
+        self.silence_frames = silence_frames
+        self.columns = columns
+        self.colors = colors
+
+
+def blit_canvas(stdscr, height, width, canvas, top, left):
+    """Draw a Canvas at (top, left) using bounds-clipped writes."""
+    for y, x, text, attr in canvas.iter_runs():
+        safe_addstr(stdscr, height, width, top + y, left + x, text, attr)
 
 
 def get_bg_char(waveform_start, waveform_height, y, x):

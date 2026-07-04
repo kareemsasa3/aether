@@ -99,6 +99,93 @@ def test_get_bg_char_non_center_is_blank():
     assert render.get_bg_char(4, 10, 10, 0) == (" ", 0)
 
 
+def test_canvas_defaults_to_spaces():
+    c = render.Canvas(2, 3)
+    assert c.get(0, 0) == (" ", 0)
+    assert c.get(1, 2) == (" ", 0)
+
+
+def test_canvas_set_get_and_clipping():
+    c = render.Canvas(4, 6)
+    c.set(1, 2, "X", 99)
+    assert c.get(1, 2) == ("X", 99)
+    # Multi-char input keeps only the first char (one cell per set).
+    c.set(0, 0, "AB", 7)
+    assert c.get(0, 0) == ("A", 7)
+    # Out-of-bounds writes are silently clipped; reads come back blank.
+    for y, x in [(-1, 0), (4, 0), (0, -1), (0, 6)]:
+        c.set(y, x, "!", 1)
+        assert c.get(y, x) == (" ", 0)
+    # Empty char is ignored.
+    c.set(2, 2, "", 5)
+    assert c.get(2, 2) == (" ", 0)
+
+
+def test_canvas_iter_runs_merges_same_attr_cells():
+    c = render.Canvas(2, 5)
+    c.set(0, 0, "a", 1)
+    c.set(0, 1, "b", 1)
+    c.set(0, 2, "c", 2)
+    runs = list(c.iter_runs())
+    # Row 0: "ab" with attr 1, "c" with attr 2, then trailing spaces attr 0.
+    assert runs[0] == (0, 0, "ab", 1)
+    assert runs[1] == (0, 2, "c", 2)
+    assert runs[2] == (0, 3, "  ", 0)
+    # Row 1 is one blank run covering the full width.
+    assert runs[3] == (1, 0, "     ", 0)
+
+
+def test_canvas_degenerate_sizes():
+    for h, w in [(0, 0), (0, 5), (5, 0), (-2, -2)]:
+        c = render.Canvas(h, w)
+        c.set(0, 0, "x", 1)  # Must not raise.
+        assert list(c.iter_runs()) == [] or all(r[2] for r in c.iter_runs())
+
+
+def test_blit_canvas_offsets_and_clips():
+    c = render.Canvas(2, 4)
+    c.set(0, 0, "h", 3)
+    c.set(0, 1, "i", 3)
+    s = _FakeScreen()
+    render.blit_canvas(s, 24, 80, c, top=5, left=10)
+    # First run lands at the offset position.
+    assert s.calls[0] == (5, 10, "hi", 3)
+    # All writes stay within the screen bounds.
+    for y, x, text, attr in s.calls:
+        assert 0 <= y < 24 and 0 <= x < 80
+        assert x + len(text) < 80
+
+
+def test_blit_canvas_clips_offscreen_rows():
+    c = render.Canvas(3, 10)
+    c.set(2, 0, "x", 1)
+    s = _FakeScreen()
+    # Screen only 2 rows tall: canvas rows at y >= 2 must be dropped.
+    render.blit_canvas(s, 2, 80, c, top=1, left=0)
+    assert all(y < 2 for y, *_ in s.calls)
+
+
+def test_frame_context_exposes_fields():
+    ctx = render.FrameContext(
+        frame=7,
+        width=40,
+        height=12,
+        amp=0.5,
+        bass=0.9,
+        mid=0.4,
+        treble=0.2,
+        spectrum=[0.0] * 12,
+        beat=1.0,
+        silence_frames=0,
+        columns=[(0.0, 999)] * 40,
+        colors={n: n for n in range(1, 11)},
+    )
+    assert (ctx.frame, ctx.width, ctx.height) == (7, 40, 12)
+    assert ctx.bass == 0.9 and ctx.beat == 1.0
+    assert len(ctx.columns) == ctx.width
+    assert set(ctx.colors) == set(range(1, 11))
+
+
 _TESTS = [
     test_safe_addstr_writes_in_bounds,
     test_safe_addstr_clips_to_right_edge,
@@ -107,6 +194,13 @@ _TESTS = [
     test_safe_addstr_swallows_curses_error,
     test_get_bg_char_center_line,
     test_get_bg_char_non_center_is_blank,
+    test_canvas_defaults_to_spaces,
+    test_canvas_set_get_and_clipping,
+    test_canvas_iter_runs_merges_same_attr_cells,
+    test_canvas_degenerate_sizes,
+    test_blit_canvas_offsets_and_clips,
+    test_blit_canvas_clips_offscreen_rows,
+    test_frame_context_exposes_fields,
 ]
 
 

@@ -220,6 +220,54 @@ def test_decay_applies_all_factors():
     assert s.waveform_left.maxlen == 3
 
 
+def test_beat_pulse_fires_on_bass_onset_and_decays():
+    s = VisualizerState()
+    s.resize(5)
+    cfg = _Config()
+
+    # Quiet frames first: baseline settles near zero, no pulse.
+    for _ in range(5):
+        s.add_scroll_sample(cfg)
+    assert s.beat_pulse < 0.01
+
+    # A bass hit well above baseline snaps the pulse to 1.0.
+    s.target_bass = 0.8
+    s.add_scroll_sample(cfg)
+    assert s.beat_pulse == 1.0
+
+    # With bass sustained, the refractory window keeps it from re-snapping
+    # every frame: the pulse decays below 1.0 on the following frames.
+    s.add_scroll_sample(cfg)
+    assert s.beat_pulse < 1.0
+    first_decay = s.beat_pulse
+    s.add_scroll_sample(cfg)
+    assert s.beat_pulse < first_decay
+
+
+def test_beat_pulse_ignores_weak_bass():
+    s = VisualizerState()
+    s.resize(5)
+    cfg = _Config()
+    s.target_bass = 0.1  # Below the absolute onset floor.
+    for _ in range(10):
+        s.add_scroll_sample(cfg)
+    assert s.beat_pulse < 0.01
+
+
+def test_silence_frames_counts_quiet_and_resets_on_signal():
+    s = VisualizerState()
+    s.resize(5)
+    cfg = _Config()
+
+    for _ in range(4):
+        s.add_scroll_sample(cfg)
+    assert s.silence_frames == 4
+
+    s.target_amp = 0.9
+    s.add_scroll_sample(cfg)
+    assert s.silence_frames == 0
+
+
 _TESTS = [
     test_default_initialization,
     test_resize_from_empty_pads_values_and_ages,
@@ -233,6 +281,9 @@ _TESTS = [
     test_ingest_rejects_non_consumable_events,
     test_add_scroll_sample_smoothing_and_count,
     test_decay_applies_all_factors,
+    test_beat_pulse_fires_on_bass_onset_and_decays,
+    test_beat_pulse_ignores_weak_bass,
+    test_silence_frames_counts_quiet_and_resets_on_signal,
 ]
 
 

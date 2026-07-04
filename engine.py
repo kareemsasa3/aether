@@ -91,6 +91,14 @@ class VisualizerState:
         self.smooth_amp = 0.0
         self.sample_count = 0
 
+        # Beat / quiet envelope for frame styles. beat_pulse snaps to 1.0 on
+        # a bass onset and decays every frame; silence_frames counts
+        # consecutive near-silent frames so styles can switch to ambient
+        # "resting" visuals instead of going blank.
+        self.beat_pulse = 0.0
+        self.silence_frames = 0
+        self._bass_baseline = 0.0
+
         # Waveform buffers (sized on resize). Empty until the caller resizes to
         # the current terminal geometry.
         self.waveform_left = deque(maxlen=0)
@@ -223,6 +231,24 @@ class VisualizerState:
         self.treble_level += (
             self.target_treble - self.treble_level
         ) * config.smooth_factor
+
+        # Beat detection: an onset is target_bass jumping well above its own
+        # slow-moving baseline. The beat_pulse < 0.25 guard is a refractory
+        # window so a sustained bass note reads as one hit, not a strobe.
+        if (
+            self.target_bass > 0.15
+            and self.target_bass > self._bass_baseline * 1.35
+            and self.beat_pulse < 0.25
+        ):
+            self.beat_pulse = 1.0
+        else:
+            self.beat_pulse *= 0.85
+        self._bass_baseline += (self.target_bass - self._bass_baseline) * 0.08
+
+        if self.smooth_amp < 0.04 and self.target_amp < 0.04:
+            self.silence_frames += 1
+        else:
+            self.silence_frames = 0
 
         # Add samples to BOTH halves (they radiate outward from center)
         for _ in range(int(config.samples_per_frame)):

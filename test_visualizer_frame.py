@@ -169,6 +169,89 @@ def test_different_styles_render_differently():
         assert frame_writes("classic_wave") != frame_writes("matrix_rain")
 
 
+class _FakeFrameStyle:
+    """Minimal frame style: fills the top-left of the canvas and records
+    the contexts it was given."""
+
+    STYLE_NAME = "Fake Frame"
+    STYLE_DESCRIPTION = "test double"
+
+    def __init__(self):
+        self.contexts = []
+
+    def render_waveform(self, i, amp, age, max_width, colors, sample_id=0):
+        return ("x", 0)
+
+    def render_frame(self, ctx, canvas):
+        self.contexts.append(ctx)
+        canvas.set(0, 0, "F", 42)
+        canvas.set(ctx.height - 1, ctx.width - 1, "F", 42)
+
+
+def test_frame_style_dispatch_and_region():
+    with _headless_curses():
+        screen = _FakeScreen(24, 80)
+        style = _FakeFrameStyle()
+        viz = aether.UltimateOscilloscope(screen, style, shm=_NoShm())
+        _seed_signal(viz)
+        screen.calls.clear()
+        viz.draw_waveform()
+
+        # The style was called with a context matching the waveform region.
+        assert len(style.contexts) == 1
+        ctx = style.contexts[0]
+        assert ctx.width == viz.graph_width
+        assert ctx.height == viz.waveform_height
+        assert len(ctx.columns) == ctx.width
+        assert set(ctx.colors) == set(range(1, 11))
+        # Seeded signal shows up in the context.
+        assert ctx.amp > 0
+        assert any(amp != 0.0 for amp, _ in ctx.columns)
+
+        # The blit repaints the full waveform region (spaces included), and
+        # never writes outside it.
+        rows_written = {y for y, *_ in screen.calls}
+        expected_rows = set(range(viz.waveform_start, viz.waveform_end))
+        assert rows_written == expected_rows
+        # Style cells arrive with their attr intact.
+        assert any(text.startswith("F") and attr == 42 for _, _, text, attr in screen.calls)
+
+
+def test_frame_style_tick_is_deterministic():
+    def frame_writes():
+        screen = _FakeScreen(24, 80)
+        viz = aether.UltimateOscilloscope(screen, _FakeFrameStyle(), shm=_NoShm())
+        _seed_signal(viz)
+        screen.calls.clear()
+        viz.tick()
+        return screen.calls
+
+    with _headless_curses():
+        assert frame_writes() == frame_writes()
+
+
+def test_frame_style_suppresses_static_grid():
+    with _headless_curses():
+        screen = _FakeScreen(24, 80)
+        viz = aether.UltimateOscilloscope(screen, _FakeFrameStyle(), shm=_NoShm())
+        screen.calls.clear()
+        viz.draw_waveform_grid()
+        assert screen.calls == []
+
+
+def test_frame_style_runs_at_degenerate_sizes():
+    for height, width in [(24, 80), (5, 12), (2, 2), (1, 1)]:
+        with _headless_curses():
+            screen = _FakeScreen(height, width)
+            viz = aether.UltimateOscilloscope(
+                screen, _FakeFrameStyle(), shm=_NoShm()
+            )
+            _seed_signal(viz)
+            viz.tick()
+            viz.decay_all()
+            viz.tick()
+
+
 def test_handle_key_quit():
     with _headless_curses():
         viz, _ = _make_viz(24, 80)
@@ -211,6 +294,10 @@ _TESTS = [
     test_tick_runs_headless_at_small_sizes,
     test_tick_is_deterministic_for_fixed_state,
     test_different_styles_render_differently,
+    test_frame_style_dispatch_and_region,
+    test_frame_style_tick_is_deterministic,
+    test_frame_style_suppresses_static_grid,
+    test_frame_style_runs_at_degenerate_sizes,
     test_handle_key_quit,
     test_handle_key_toggles_design_mode,
     test_handle_key_ignores_unknown_keys,

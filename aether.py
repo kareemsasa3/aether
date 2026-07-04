@@ -59,6 +59,11 @@ class UltimateOscilloscope:
         # Style module for waveform rendering
         self.style = style_module
 
+        # Frame counter for frame styles (render_frame). Deliberately not
+        # reset in recalculate_layout: it drives style animation, not perf
+        # accounting, and resizing should not restart every animation.
+        self.frame_index = 0
+
         # Calculate Layout (depends on state above)
         self.recalculate_layout()
 
@@ -288,6 +293,12 @@ class UltimateOscilloscope:
 
     def draw_waveform_grid(self):
         """Draw subtle center line with gradient fade at edges"""
+        # Frame styles repaint the whole waveform region every tick and own
+        # their own background/baseline, so the static grid would only
+        # flash for one frame and then vanish.
+        if hasattr(self.style, "render_frame"):
+            return
+
         center_y = self.waveform_start + (self.waveform_height // 2)
 
         # Create a subtle center line with fading edges
@@ -320,8 +331,72 @@ class UltimateOscilloscope:
                 curses.color_pair(8),
             )
 
+    def _frame_columns(self, width):
+        """Per-column (amplitude, age) across the canvas, left edge first.
+
+        Maps the two center-out deques onto screen columns exactly like the
+        legacy draw_waveform loops: right-half index 0 sits on the center
+        column, left-half index 0 just left of it. Columns with no sample
+        (wider terminal than buffer) read as silent and very old.
+        """
+        center = width // 2
+        cols = [(0.0, 999)] * width
+        state = self.state
+        for i, (amp, age) in enumerate(
+            zip(state.waveform_left, state.waveform_age_left)
+        ):
+            c = center - 1 - i
+            if 0 <= c < width:
+                cols[c] = (amp, age)
+        for i, (amp, age) in enumerate(
+            zip(state.waveform_right, state.waveform_age_right)
+        ):
+            c = center + i
+            if 0 <= c < width:
+                cols[c] = (amp, age)
+        return cols
+
+    def draw_frame_style(self):
+        """Render a full-frame style: build context, paint canvas, blit.
+
+        The canvas covers the whole waveform region and defaults to spaces,
+        so blitting it doubles as the region's per-frame clear — last_ys
+        stays untouched and clear_waveform_area is naturally a no-op.
+        """
+        h, w = self.waveform_height, self.graph_width
+        if h <= 0 or w <= 0:
+            return
+        canvas = render.Canvas(h, w)
+        ctx = render.FrameContext(
+            frame=self.frame_index,
+            width=w,
+            height=h,
+            amp=self.state.smooth_amp,
+            bass=self.bass_level,
+            mid=self.mid_level,
+            treble=self.treble_level,
+            spectrum=list(self.spectrum_values),
+            beat=self.state.beat_pulse,
+            silence_frames=self.state.silence_frames,
+            columns=self._frame_columns(w),
+            colors={n: curses.color_pair(n) for n in range(1, 11)},
+        )
+        self.style.render_frame(ctx, canvas)
+        render.blit_canvas(
+            self.stdscr,
+            self.height,
+            self.width,
+            canvas,
+            self.waveform_start,
+            self.graph_x_start,
+        )
+
     def draw_waveform(self):
         """Draw waveform radiating from center outward"""
+        if hasattr(self.style, "render_frame"):
+            self.draw_frame_style()
+            return
+
         center_y = self.waveform_start + (self.waveform_height // 2)
         center_x = self.graph_x_start + (self.graph_width // 2)
         scale = int(self.waveform_height * 0.4)
@@ -758,6 +833,8 @@ class UltimateOscilloscope:
 
         self.draw_status()
         self.draw_debug_stats()
+
+        self.frame_index += 1
 
     def handle_key(self, key):
         """Handle one keypress; returns False when the loop should quit."""
