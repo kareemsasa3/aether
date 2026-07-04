@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # aether_daemon.py - Direct PipeWire pipeline
 import subprocess
+import os
 import numpy as np
 import sys
 import signal
@@ -89,8 +90,12 @@ class AetherDaemon:
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
 
+        self.audio_target = os.environ.get("AETHER_AUDIO_TARGET", "").strip()
         print("[Audio Daemon V3] Using PipeWire direct pipeline")
-        print("[Audio Daemon V3] Using system default microphone")
+        if self.audio_target:
+            print(f"[Audio Daemon V3] Using PipeWire target: {self.audio_target}")
+        else:
+            print("[Audio Daemon V3] Using system default microphone")
         print(f"[Audio Daemon V3] Sample rate: {self.SAMPLE_RATE} Hz")
         print("[Audio Daemon V3] Press Ctrl+C to stop\n")
 
@@ -167,7 +172,10 @@ class AetherDaemon:
         )
         band_name, band_value = max_band
 
-        if total_energy < 0.10 and band_value < 0.15:
+        # Use the shared audio threshold for event gating. Sink-monitor audio
+        # can be much lower than microphone capture, so avoid a second, higher
+        # hardcoded threshold that suppresses valid system-audio events.
+        if max(total_energy, band_value) < config.AUDIO_THRESHOLD:
             return
 
         dominant_freq = self.BAND_CENTER_FREQUENCIES.get(
@@ -198,8 +206,8 @@ class AetherDaemon:
 
     def run(self):
         """Main loop - read from pw-record pipe"""
-        # Start pw-record as subprocess, pipe stdout to us
-        # No --target flag = uses system default microphone
+        # Start pw-record as subprocess, pipe stdout to us.
+        # No --target flag = uses system default microphone.
         cmd = [
             "pw-record",
             "--format",
@@ -208,8 +216,12 @@ class AetherDaemon:
             "1",  # Mono (simpler)
             "--rate",
             str(self.SAMPLE_RATE),
-            "-",  # Output to stdout
         ]
+
+        if self.audio_target:
+            cmd.extend(["--target", self.audio_target])
+
+        cmd.append("-")  # Output to stdout
 
         try:
             self.process = subprocess.Popen(
@@ -233,8 +245,12 @@ class AetherDaemon:
                             print(f"  {line}")
                 return 1
 
-            print("🎤 Listening to default microphone!")
-            print("Play music, talk, whistle, sing!")
+            if self.audio_target:
+                print(f"🔊 Listening to PipeWire target: {self.audio_target}")
+                print("Play system audio to drive the visualization!")
+            else:
+                print("🎤 Listening to default microphone!")
+                print("Play music, talk, whistle, sing!")
             print("-" * 70)
 
             bytes_per_sample = 2  # 16-bit = 2 bytes
