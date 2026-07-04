@@ -3,14 +3,13 @@
 import curses
 import time
 import sys
-import importlib.util
-from pathlib import Path
 from aether_shm import AetherSharedMemory, read_event_legacy
 import aether_config as config
 from ui import overlays
 from config_model import VizConfig
 from engine import VisualizerState
 import render
+import style_catalog
 
 
 class UltimateOscilloscope:
@@ -815,36 +814,20 @@ class UltimateOscilloscope:
 
 def load_default_style():
     """Fallback to a known safe style (neon_wave or classic_wave)"""
-    styles_dir = Path(__file__).parent / "styles"
-
-    # Try neon_wave first (newer, nicer default)
-    for default_name in ["neon_wave", "classic_wave"]:
-        style_path = styles_dir / f"{default_name}.py"
-        if style_path.exists():
-            try:
-                spec = importlib.util.spec_from_file_location(default_name, style_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                return module
-            except Exception:
-                continue
-
-    print("CRITICAL: No default styles found!")
-    sys.exit(1)
+    module = style_catalog.load_default_style()
+    if module is None:
+        print("CRITICAL: No default styles found!")
+        sys.exit(1)
+    return module
 
 
 def load_style(style_name=None):
     """Load a visualization style"""
-    styles_dir = Path(__file__).parent / "styles"
-
-    if not styles_dir.exists():
+    if not style_catalog.STYLES_DIR.exists():
         print("No styles directory found!")
         sys.exit(1)
 
-    # Get available styles
-    available_styles = sorted(
-        [f.stem for f in styles_dir.glob("*.py") if f.stem != "__init__"]
-    )
+    available_styles = style_catalog.list_style_names()
 
     if not available_styles:
         print("No styles found in styles/ directory!")
@@ -855,36 +838,21 @@ def load_style(style_name=None):
         print("\n" + "=" * 70)
         print(" ⚡ AETHER VISUALIZATION STYLES ⚡".center(70))
         print("=" * 70)
-        for idx, style in enumerate(available_styles, 1):
-            style_path = styles_dir / f"{style}.py"
-            spec = importlib.util.spec_from_file_location(style, style_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            desc = getattr(module, "STYLE_DESCRIPTION", "No description")
-            name = getattr(module, "STYLE_NAME", style)
-            print(f"  {idx:2d}. {name:20s} - {desc}")
+        for idx, entry in enumerate(style_catalog.load_catalog(), 1):
+            desc = entry["desc"] or "No description"
+            print(f"  {idx:2d}. {entry['display']:20s} - {desc}")
         print("=" * 70)
 
-        choice = input("\nSelect style (number or name): ").strip()
-
-        try:
-            choice_idx = int(choice) - 1
-            if 0 <= choice_idx < len(available_styles):
-                style_name = available_styles[choice_idx]
-        except ValueError:
-            style_name = choice
+        choice = input("\nSelect style (number or name): ")
+        style_name = style_catalog.resolve_style_name(choice, available_styles)
 
     # Load the style module
-    style_path = styles_dir / f"{style_name}.py"
-    if not style_path.exists():
+    try:
+        style_module = style_catalog.load_style_module(style_name)
+    except FileNotFoundError:
         print(f"Style '{style_name}' not found!")
         print(f"Available styles: {', '.join(available_styles)}")
         sys.exit(1)
-
-    try:
-        spec = importlib.util.spec_from_file_location(style_name, style_path)
-        style_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(style_module)
     except Exception as e:
         print(f"Error loading style '{style_name}': {e}")
         return load_default_style()

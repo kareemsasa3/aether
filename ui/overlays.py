@@ -12,37 +12,15 @@ plain `(stdscr, config_model)` surface is deferred to Phases 2-3.
 """
 
 import curses
-import importlib.util
-from pathlib import Path
+
+import style_catalog
 
 
 def run_style_picker(viz):
     """Show modern style selection overlay"""
-    # Styles live at the project root; this module sits one level down in ui/,
-    # so resolve up two parents rather than using this file's directory.
-    styles_dir = Path(__file__).resolve().parent.parent / "styles"
-    available_styles = sorted(
-        [f.stem for f in styles_dir.glob("*.py") if f.stem != "__init__"]
-    )
-
-    # Load style metadata
-    style_info = []
-    for style_name in available_styles:
-        style_path = styles_dir / f"{style_name}.py"
-        try:
-            spec = importlib.util.spec_from_file_location(style_name, style_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            style_info.append(
-                {
-                    "name": style_name,
-                    "display": getattr(module, "STYLE_NAME", style_name),
-                    "desc": getattr(module, "STYLE_DESCRIPTION", ""),
-                    "module": module,
-                }
-            )
-        except Exception:
-            continue
+    # Catalog entries carry name/display/desc/module, sorted by slug, with
+    # unloadable styles already skipped — exactly what the picker needs.
+    style_info = style_catalog.load_catalog()
 
     # Get current style name for highlighting
     current_style = getattr(viz.style, "STYLE_NAME", "")
