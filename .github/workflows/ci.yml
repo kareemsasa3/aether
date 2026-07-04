@@ -40,6 +40,7 @@ jobs:
           test_config_wiring.py
           test_aether_shm_seqlock.py
           test_config_model.py
+          test_daemon_capture.py
           test_render.py
           test_engine.py
           test_styles.py
@@ -71,4 +72,4 @@ jobs:
         run: python test_visualizer_frame.py
 
       - name: Test suite (pytest)
-        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py test_render.py test_engine.py test_styles.py test_style_catalog.py test_visualizer_frame.py -q
+        run: python -m pytest test_config_wiring.py test_aether_shm_seqlock.py test_config_model.py test_daemon_capture.py test_render.py test_engine.py test_styles.py test_style_catalog.py test_visualizer_frame.py -q
