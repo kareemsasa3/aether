@@ -16,6 +16,7 @@ the event loop stay on `UltimateOscilloscope` (see the Phase 4 audit).
 """
 
 import math
+import time
 from collections import deque
 
 
@@ -54,7 +55,18 @@ class VisualizerState:
     # Legacy single-frequency spectrum decay (non-selected bins fade)
     SPECTRUM_DECAY_LEGACY = 0.8
 
-    def __init__(self, spectrum_bins=12):
+    # Keep the last audio amplitude across the gap between daemon publications,
+    # then release it after the same 100 ms silence grace used by the RGB
+    # consumer. The engine owns this constant so its timing remains headless
+    # and independent of device-specific RGB configuration.
+    AUDIO_EVENT_GRACE_SECONDS = 0.1
+
+    def __init__(self, spectrum_bins=12, clock=None):
+        # Monotonic time avoids wall-clock adjustments changing event age. Tests
+        # inject a deterministic clock so freshness transitions require no sleep.
+        self._clock = clock if clock is not None else time.monotonic
+        self._last_audio_event_time = None
+
         # Spectrum data (frequency bins)
         self.spectrum_bins = spectrum_bins
         self.spectrum_values = [0.0] * self.spectrum_bins
@@ -154,6 +166,13 @@ class VisualizerState:
             self.add_wave(event["frequency"], event.get("amplitude", 0.8))
             self.update_spectrum(event["frequency"], event.get("amplitude", 0.8))
             self.update_rgb_levels(event["frequency"], event.get("amplitude", 0.8))
+
+        if event.get("type") == "audio":
+            self._last_audio_event_time = self._clock()
+        else:
+            # A legacy key event now owns the target; an older audio timestamp
+            # must not expire the newly supplied non-audio amplitude.
+            self._last_audio_event_time = None
         return True
 
     def add_wave(self, frequency, amplitude=0.8):
@@ -220,6 +239,18 @@ class VisualizerState:
         Called once per frame in the main loop for fluid animation.
         Adds SAMPLES_PER_FRAME samples to both left and right halves.
         """
+        # Preserve the latest daemon amplitude across normal publication gaps,
+        # but release a stale audio target so smoothing and silence accounting
+        # can carry the visualizer into its quiet state. Deliberately leave
+        # smooth_amp untouched here; the existing interpolation decays it.
+        if (
+            self._last_audio_event_time is not None
+            and self._clock() - self._last_audio_event_time
+            >= self.AUDIO_EVENT_GRACE_SECONDS
+        ):
+            self.target_amp = 0.0
+            self._last_audio_event_time = None
+
         # Smooth interpolation toward target amplitude
         # Apply intensity multiplier to target amplitude
         boosted_target = min(1.0, self.target_amp * config.intensity)

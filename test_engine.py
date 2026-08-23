@@ -11,6 +11,7 @@ buffers, spectrum bars, RGB levels, and the smoothing scalars — out of
   - banded update_spectrum_from_bands (band->bins mapping, intensity clamp)
   - RGB level math + clamping
   - legacy vs banded event dispatch via ingest()
+  - audio-event freshness, expiry, and active-to-silent transition
   - add_scroll_sample smoothing + sample-count + fresh-sample insertion
   - decay() for spectrum, waveform, ages, and RGB targets
 
@@ -43,6 +44,16 @@ class _Config:
         self.rgb_decay = 0.8
         for k, v in kw.items():
             setattr(self, k, v)
+
+
+class _Clock:
+    """Deterministic monotonic clock for freshness tests."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
 
 
 def test_default_initialization():
@@ -268,6 +279,74 @@ def test_silence_frames_counts_quiet_and_resets_on_signal():
     assert s.silence_frames == 0
 
 
+def test_active_audio_target_expires_and_reaches_quiet_state():
+    clock = _Clock()
+    s = VisualizerState(clock=clock)
+    s.resize(5)
+    cfg = _Config(smooth_factor=0.5)
+
+    s.ingest({"type": "audio", "frequency": 440, "amplitude": 0.8}, cfg)
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.8
+    active_smooth_amp = s.smooth_amp
+
+    # The last event still drives the target immediately before the 100 ms
+    # grace expires.
+    clock.now = s.AUDIO_EVENT_GRACE_SECONDS - 0.001
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.8
+    assert s.smooth_amp > active_smooth_amp
+
+    # At the threshold only the target is released; smooth_amp follows the
+    # existing interpolation instead of snapping directly to zero.
+    clock.now = s.AUDIO_EVENT_GRACE_SECONDS
+    smooth_before_expiry = s.smooth_amp
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.0
+    assert 0.0 < s.smooth_amp < smooth_before_expiry
+
+    # Once the smoothed envelope falls below the quiet threshold, the normal
+    # counter advances far enough for frame styles' silence_frames > 45 gate.
+    for _ in range(60):
+        s.add_scroll_sample(cfg)
+    assert s.silence_frames > 45
+
+
+def test_fresh_audio_event_resets_grace_interval():
+    clock = _Clock()
+    s = VisualizerState(clock=clock)
+    s.resize(5)
+    cfg = _Config()
+
+    s.ingest({"type": "audio", "frequency": 440, "amplitude": 0.8}, cfg)
+    clock.now = 0.09
+    s.ingest({"type": "audio", "frequency": 440, "amplitude": 0.4}, cfg)
+
+    # This is stale relative to the first event but still fresh relative to the
+    # replacement event, so the replacement amplitude remains active.
+    clock.now = 0.15
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.4
+
+    clock.now = 0.20
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.0
+
+
+def test_key_event_supersedes_audio_freshness():
+    clock = _Clock()
+    s = VisualizerState(clock=clock)
+    s.resize(5)
+    cfg = _Config()
+
+    s.ingest({"type": "audio", "frequency": 440, "amplitude": 0.8}, cfg)
+    clock.now = 0.20
+    s.ingest({"type": "key_press", "frequency": 440, "amplitude": 0.6}, cfg)
+    clock.now = 1.0
+    s.add_scroll_sample(cfg)
+    assert s.target_amp == 0.6
+
+
 _TESTS = [
     test_default_initialization,
     test_resize_from_empty_pads_values_and_ages,
@@ -284,6 +363,9 @@ _TESTS = [
     test_beat_pulse_fires_on_bass_onset_and_decays,
     test_beat_pulse_ignores_weak_bass,
     test_silence_frames_counts_quiet_and_resets_on_signal,
+    test_active_audio_target_expires_and_reaches_quiet_state,
+    test_fresh_audio_event_resets_grace_interval,
+    test_key_event_supersedes_audio_freshness,
 ]
 
 
